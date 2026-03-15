@@ -27,6 +27,7 @@ export default function StudentPayments() {
   const studentSession = useAuthStore((state) => state.studentSession)
 
   const [slips, setSlips] = useState([])
+  const [availableMonths, setAvailableMonths] = useState([])
   const [studentInfo, setStudentInfo] = useState(null)
   const [hallInfo, setHallInfo] = useState(null)
   const [selectedMonth, setSelectedMonth] = useState('')
@@ -39,7 +40,7 @@ export default function StudentPayments() {
     }
 
     setLoading(true)
-    const [slipsRes, studentRes] = await Promise.all([
+    const [slipsRes, studentRes, billingRes] = await Promise.all([
       supabase
         .from('payment_slips')
         .select('*')
@@ -48,6 +49,11 @@ export default function StudentPayments() {
       supabase.rpc('get_student_profile', {
         p_student_uuid: studentSession.id,
       }),
+      supabase
+        .from('billing_configs')
+        .select('billing_month')
+        .eq('hall_id', studentSession.hall_id)
+        .order('billing_month', { ascending: false }),
     ])
 
     const studentProfile = Array.isArray(studentRes.data) ? studentRes.data[0] : studentRes.data
@@ -60,7 +66,16 @@ export default function StudentPayments() {
       toast.error(studentRes.error.message || 'Failed to load student profile')
     }
 
+    if (billingRes.error) {
+      toast.error(billingRes.error.message || 'Failed to load billing months')
+    }
+
+    const monthsFromSlips = (slipsRes.data ?? []).map((slip) => slip.billing_month).filter(Boolean)
+    const monthsFromConfigs = (billingRes.data ?? []).map((item) => item.billing_month).filter(Boolean)
+    const mergedMonths = [...new Set([...monthsFromSlips, ...monthsFromConfigs])]
+
     setSlips(slipsRes.data ?? [])
+    setAvailableMonths(mergedMonths)
     setStudentInfo(
       studentProfile
         ? {
@@ -82,7 +97,12 @@ export default function StudentPayments() {
           }
         : null,
     )
-    setSelectedMonth((current) => current || slipsRes.data?.[0]?.billing_month || '')
+    setSelectedMonth((current) => {
+      if (current && mergedMonths.includes(current)) {
+        return current
+      }
+      return mergedMonths[0] || ''
+    })
     setLoading(false)
   }
 
@@ -90,7 +110,7 @@ export default function StudentPayments() {
     loadData()
   }, [studentSession?.hall_id, studentSession?.id])
 
-  const selectedSlip = slips.find((slip) => slip.billing_month === selectedMonth) ?? slips[0] ?? null
+  const selectedSlip = slips.find((slip) => slip.billing_month === selectedMonth) ?? null
 
   const dueMonths = useMemo(
     () =>
@@ -124,13 +144,18 @@ export default function StudentPayments() {
             <select
               value={selectedMonth}
               onChange={(event) => setSelectedMonth(event.target.value)}
+              disabled={availableMonths.length === 0}
               className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none ring-primary focus:border-primary focus:ring-2"
             >
-              {slips.map((slip) => (
-                <option key={slip.id} value={slip.billing_month}>
-                  {formatBillingMonthLabel(slip.billing_month)}
-                </option>
-              ))}
+              {availableMonths.length === 0 ? (
+                <option value="">No billing month available yet</option>
+              ) : (
+                availableMonths.map((billingMonth) => (
+                  <option key={billingMonth} value={billingMonth}>
+                    {formatBillingMonthLabel(billingMonth)}
+                  </option>
+                ))
+              )}
             </select>
           </label>
 
@@ -163,6 +188,10 @@ export default function StudentPayments() {
             {slips.length === 0 ? (
               <tr>
                 <td colSpan={12} className="px-4 py-10 text-center text-slate-500">No payment slips available yet.</td>
+              </tr>
+            ) : !selectedSlip ? (
+              <tr>
+                <td colSpan={12} className="px-4 py-10 text-center text-slate-500">No payment slip generated for the selected month yet.</td>
               </tr>
             ) : (
               slips.map((slip) => (
