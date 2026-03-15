@@ -1,4 +1,4 @@
-import { Eye, EyeOff, KeyRound, Pencil, RefreshCw, Search } from 'lucide-react'
+import { Eye, EyeOff, KeyRound, Pencil, RefreshCw, Search, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 
@@ -37,6 +37,7 @@ export default function ViewAccountsPasswords() {
   const [resetTarget, setResetTarget] = useState(null)
   const [resetPassword, setResetPassword] = useState(makeRandomPassword())
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [deletingStudentId, setDeletingStudentId] = useState('')
 
   const refreshStudents = async () => {
     if (!user?.hall_id) {
@@ -168,6 +169,31 @@ export default function ViewAccountsPasswords() {
     setResetTarget(null)
     setResetPassword(makeRandomPassword())
     setConfirmPassword('')
+    refreshStudents()
+  }
+
+  const deleteStudentAccount = async (student) => {
+    if (!student?.id) {
+      return
+    }
+
+    const confirmed = window.confirm(`Delete student account ${student.student_id}? This action cannot be undone.`)
+    if (!confirmed) {
+      return
+    }
+
+    setDeletingStudentId(student.id)
+
+    const { error } = await supabase.from('students').delete().eq('id', student.id)
+
+    if (error) {
+      toast.error(error.message || 'Failed to delete student account')
+      setDeletingStudentId('')
+      return
+    }
+
+    toast.success(`Student account ${student.student_id} deleted`)
+    setDeletingStudentId('')
     refreshStudents()
   }
 
@@ -310,6 +336,15 @@ export default function ViewAccountsPasswords() {
                           className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
                         >
                           <KeyRound className="h-3.5 w-3.5" /> Reset Password
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteStudentAccount(student)}
+                          disabled={deletingStudentId === student.id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          {deletingStudentId === student.id ? 'Deleting...' : 'Delete'}
                         </button>
                       </div>
                     </td>
