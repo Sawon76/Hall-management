@@ -3,9 +3,7 @@ import { format, isValid, parse } from 'date-fns'
 import { AlertTriangle, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-import { createPaymentSlipBlobUrl, downloadPaymentSlipPDF } from '../../components/payment/PDFSlipGenerator'
-import PDFViewer from '../../components/payment/PDFViewer'
-import LoadingSpinner from '../../components/shared/LoadingSpinner'
+import { downloadPaymentSlipPDF } from '../../components/payment/PDFSlipGenerator'
 import { DEFAULT_UNIVERSITY_LOGO } from '../../constants'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuthStore } from '../../store/authStore'
@@ -32,8 +30,6 @@ export default function StudentPayments() {
   const [studentInfo, setStudentInfo] = useState(null)
   const [hallInfo, setHallInfo] = useState(null)
   const [selectedMonth, setSelectedMonth] = useState('')
-  const [pdfUrl, setPdfUrl] = useState('')
-  const [pdfPreviewError, setPdfPreviewError] = useState('')
   const [loading, setLoading] = useState(true)
 
   const loadData = async () => {
@@ -96,51 +92,6 @@ export default function StudentPayments() {
 
   const selectedSlip = slips.find((slip) => slip.billing_month === selectedMonth) ?? slips[0] ?? null
 
-  useEffect(() => {
-    let active = true
-    let previousUrl = ''
-
-    const buildPdfUrl = async () => {
-      if (!selectedSlip || !studentInfo || !hallInfo) {
-        setPdfPreviewError('')
-        setPdfUrl('')
-        return
-      }
-
-      try {
-        const nextUrl = await createPaymentSlipBlobUrl(selectedSlip, studentInfo, hallInfo)
-        if (!active) {
-          URL.revokeObjectURL(nextUrl)
-          return
-        }
-
-        setPdfPreviewError('')
-        previousUrl = nextUrl
-        setPdfUrl(nextUrl)
-      } catch {
-        if (!active) {
-          return
-        }
-
-        setPdfUrl('')
-        setPdfPreviewError('Could not render PDF preview for this slip. You can still download the PDF.')
-      }
-
-      if (!active) {
-        return
-      }
-    }
-
-    void buildPdfUrl()
-
-    return () => {
-      active = false
-      if (previousUrl) {
-        URL.revokeObjectURL(previousUrl)
-      }
-    }
-  }, [hallInfo, selectedSlip, studentInfo])
-
   const dueMonths = useMemo(
     () =>
       slips
@@ -195,13 +146,9 @@ export default function StudentPayments() {
         </div>
       </div>
 
-      {pdfPreviewError ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-soft">
-          {pdfPreviewError}
-        </div>
-      ) : null}
-
-      <PDFViewer fileUrl={pdfUrl} height="60vh" />
+      <div className="rounded-xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-600 shadow-soft">
+        Integrated PDF preview has been removed for stability. Use the Download button to get the payment slip PDF.
+      </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-soft">
         <table className="min-w-full text-left text-sm">
