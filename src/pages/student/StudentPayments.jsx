@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import { format, parse } from 'date-fns'
+import { format, isValid, parse } from 'date-fns'
 import { AlertTriangle, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -12,6 +12,19 @@ import { formatMoney } from '../../utils/paymentUtils'
 
 const parseBillingMonth = (value) => parse(value, 'yyyy-MM', new Date())
 const PDFViewer = lazy(() => import('../../components/payment/PDFViewer'))
+
+const formatBillingMonthLabel = (billingMonth) => {
+  if (!billingMonth || typeof billingMonth !== 'string') {
+    return '-'
+  }
+
+  const parsed = parseBillingMonth(billingMonth)
+  if (!isValid(parsed)) {
+    return billingMonth
+  }
+
+  return format(parsed, 'MMMM yyyy')
+}
 
 export default function StudentPayments() {
   const studentSession = useAuthStore((state) => state.studentSession)
@@ -117,7 +130,7 @@ export default function StudentPayments() {
     () =>
       slips
         .filter((slip) => slip.status !== 'paid' || Number(slip.dues || 0) > 0)
-        .map((slip) => format(parseBillingMonth(slip.billing_month), 'MMMM yyyy')),
+        .map((slip) => formatBillingMonthLabel(slip.billing_month)),
     [slips],
   )
 
@@ -149,7 +162,7 @@ export default function StudentPayments() {
             >
               {slips.map((slip) => (
                 <option key={slip.id} value={slip.billing_month}>
-                  {format(parseBillingMonth(slip.billing_month), 'MMMM yyyy')}
+                  {formatBillingMonthLabel(slip.billing_month)}
                 </option>
               ))}
             </select>
@@ -188,7 +201,7 @@ export default function StudentPayments() {
             ) : (
               slips.map((slip) => (
                 <tr key={slip.id} className="border-t border-slate-100">
-                  <td className="px-4 py-3 font-medium text-slate-800">{format(parseBillingMonth(slip.billing_month), 'MMMM yyyy')}</td>
+                  <td className="px-4 py-3 font-medium text-slate-800">{formatBillingMonthLabel(slip.billing_month)}</td>
                   <td className="px-4 py-3">{slip.no_of_meals}</td>
                   <td className="px-4 py-3">{formatMoney(slip.meal_charge)}</td>
                   <td className="px-4 py-3">{formatMoney(slip.other_bills)}</td>
