@@ -1,9 +1,10 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { format, isValid, parse } from 'date-fns'
 import { AlertTriangle, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { createPaymentSlipBlobUrl, downloadPaymentSlipPDF } from '../../components/payment/PDFSlipGenerator'
+import PDFViewer from '../../components/payment/PDFViewer'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { DEFAULT_UNIVERSITY_LOGO } from '../../constants'
 import { supabase } from '../../lib/supabaseClient'
@@ -11,8 +12,6 @@ import { useAuthStore } from '../../store/authStore'
 import { formatMoney } from '../../utils/paymentUtils'
 
 const parseBillingMonth = (value) => parse(value, 'yyyy-MM', new Date())
-const PDFViewer = lazy(() => import('../../components/payment/PDFViewer'))
-
 const formatBillingMonthLabel = (billingMonth) => {
   if (!billingMonth || typeof billingMonth !== 'string') {
     return '-'
@@ -34,6 +33,7 @@ export default function StudentPayments() {
   const [hallInfo, setHallInfo] = useState(null)
   const [selectedMonth, setSelectedMonth] = useState('')
   const [pdfUrl, setPdfUrl] = useState('')
+  const [pdfPreviewError, setPdfPreviewError] = useState('')
   const [loading, setLoading] = useState(true)
 
   const loadData = async () => {
@@ -102,18 +102,33 @@ export default function StudentPayments() {
 
     const buildPdfUrl = async () => {
       if (!selectedSlip || !studentInfo || !hallInfo) {
+        setPdfPreviewError('')
         setPdfUrl('')
         return
       }
 
-      const nextUrl = await createPaymentSlipBlobUrl(selectedSlip, studentInfo, hallInfo)
-      if (!active) {
-        URL.revokeObjectURL(nextUrl)
-        return
+      try {
+        const nextUrl = await createPaymentSlipBlobUrl(selectedSlip, studentInfo, hallInfo)
+        if (!active) {
+          URL.revokeObjectURL(nextUrl)
+          return
+        }
+
+        setPdfPreviewError('')
+        previousUrl = nextUrl
+        setPdfUrl(nextUrl)
+      } catch {
+        if (!active) {
+          return
+        }
+
+        setPdfUrl('')
+        setPdfPreviewError('Could not render PDF preview for this slip. You can still download the PDF.')
       }
 
-      previousUrl = nextUrl
-      setPdfUrl(nextUrl)
+      if (!active) {
+        return
+      }
     }
 
     void buildPdfUrl()
@@ -180,9 +195,13 @@ export default function StudentPayments() {
         </div>
       </div>
 
-      <Suspense fallback={<LoadingSpinner variant="inline" label="Loading PDF viewer..." />}>
-        <PDFViewer fileUrl={pdfUrl} height="60vh" />
-      </Suspense>
+      {pdfPreviewError ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-soft">
+          {pdfPreviewError}
+        </div>
+      ) : null}
+
+      <PDFViewer fileUrl={pdfUrl} height="60vh" />
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-soft">
         <table className="min-w-full text-left text-sm">
