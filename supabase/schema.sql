@@ -355,28 +355,18 @@ DROP POLICY IF EXISTS auth_manage_slips ON payment_slips;
 CREATE POLICY auth_manage_slips ON payment_slips
   FOR ALL
   USING (
-    auth.role() = 'authenticated'
-    AND (
-      public.get_my_role() IN ('provost', 'staff')
-      OR EXISTS (
-        SELECT 1
-        FROM students
-        WHERE students.id = payment_slips.student_id
-          AND students.created_by = auth.uid()
-      )
+    (
+      auth.role() = 'authenticated'
+      AND public.get_my_role() IN ('provost', 'staff')
     )
+    OR public.student_exists(payment_slips.student_id)
   )
   WITH CHECK (
-    auth.role() = 'authenticated'
-    AND (
-      public.get_my_role() IN ('provost', 'staff')
-      OR EXISTS (
-        SELECT 1
-        FROM students
-        WHERE students.id = payment_slips.student_id
-          AND students.created_by = auth.uid()
-      )
+    (
+      auth.role() = 'authenticated'
+      AND public.get_my_role() IN ('provost', 'staff')
     )
+    OR public.student_exists(payment_slips.student_id)
   );
 
 DROP POLICY IF EXISTS students_insert_contact_messages ON contact_messages;

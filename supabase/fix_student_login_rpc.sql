@@ -195,5 +195,23 @@ CREATE POLICY auth_manage_meals ON public.meal_records
     OR public.student_exists(meal_records.student_id)
   );
 
+DROP POLICY IF EXISTS auth_manage_slips ON public.payment_slips;
+CREATE POLICY auth_manage_slips ON public.payment_slips
+  FOR ALL
+  USING (
+    (
+      auth.role() = 'authenticated'
+      AND public.get_my_role() IN ('provost', 'staff')
+    )
+    OR public.student_exists(payment_slips.student_id)
+  )
+  WITH CHECK (
+    (
+      auth.role() = 'authenticated'
+      AND public.get_my_role() IN ('provost', 'staff')
+    )
+    OR public.student_exists(payment_slips.student_id)
+  );
+
 -- Optional quick check (replace values):
 -- select * from public.student_login('0802420105101072', 'YOUR_ANNEX_HALL_UUID', 'Kv9QaNZM');
