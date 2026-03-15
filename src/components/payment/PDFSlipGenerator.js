@@ -71,7 +71,7 @@ export const generatePaymentSlipPDF = async (slip, student, hall) => {
 
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 10,
-    head: [['Description', 'Amount (৳)']],
+    head: [['Description', 'Amount']],
     body: [
       ['No of Meals', String(slip.no_of_meals)],
       ['Meal Charge', formatMoney(slip.meal_charge)],

@@ -94,4 +94,4 @@ export const generateAllSlips = (
   })
 }
 
-export const formatMoney = (value) => `৳${toNumber(value).toFixed(2)}`
+export const formatMoney = (value) => toNumber(value).toFixed(2)
