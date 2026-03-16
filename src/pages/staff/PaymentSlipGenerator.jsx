@@ -1,9 +1,8 @@
-import { endOfMonth, format, startOfMonth, subMonths } from 'date-fns'
-import { Check, Download, Eye, FileSpreadsheet } from 'lucide-react'
+import { endOfMonth, format, isValid, parse, startOfMonth, subMonths } from 'date-fns'
+import { Check, Download, Eye, FileSpreadsheet, Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 
-import PaymentSlipTemplate from '../../components/payment/PaymentSlipTemplate'
 import {
   downloadPaymentSlipPDF,
   openPaymentSlipPDF,
@@ -49,6 +48,15 @@ const getBillingFieldLabel = (fieldName) => {
   return fieldName.replaceAll('_', ' ').replace(/\b\w/g, (character) => character.toUpperCase())
 }
 
+const formatBillingMonthLabel = (billingMonth) => {
+  if (!billingMonth) {
+    return '-'
+  }
+
+  const parsed = parse(billingMonth, 'yyyy-MM', new Date())
+  return isValid(parsed) ? format(parsed, 'MMMM yyyy') : billingMonth
+}
+
 export default function PaymentSlipGenerator() {
   const user = useAuthStore((state) => state.user)
   const currentMonth = format(new Date(), 'yyyy-MM')
@@ -61,7 +69,9 @@ export default function PaymentSlipGenerator() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [markingPaidId, setMarkingPaidId] = useState('')
-  const [selectedSlipId, setSelectedSlipId] = useState('')
+  const [editingSlip, setEditingSlip] = useState(null)
+  const [savingSlip, setSavingSlip] = useState(false)
+  const [deletingSlipId, setDeletingSlipId] = useState('')
 
   const loadPageData = async (billingMonth = billingForm.billing_month) => {
     if (!user?.hall_id) {
@@ -81,7 +91,7 @@ export default function PaymentSlipGenerator() {
         .from('payment_slips')
         .select('*, students(student_id, name, department, batch)')
         .eq('hall_id', user.hall_id)
-        .eq('billing_month', billingMonth)
+        .order('billing_month', { ascending: false })
         .order('student_id', { ascending: true }),
       supabase
         .from('halls')
@@ -128,22 +138,10 @@ export default function PaymentSlipGenerator() {
     loadPageData(billingForm.billing_month)
   }, [user?.hall_id])
 
-  useEffect(() => {
-    setSelectedSlipId((current) => current || slips[0]?.id || '')
-  }, [slips])
-
   const studentsMap = useMemo(
     () => Object.fromEntries(students.map((student) => [student.id, student])),
     [students],
   )
-
-  const selectedSlip = slips.find((slip) => slip.id === selectedSlipId) ?? slips[0] ?? null
-  const selectedStudent = selectedSlip
-    ? {
-        ...studentsMap[selectedSlip.student_id],
-        ...selectedSlip.students,
-      }
-    : null
 
   const totals = useMemo(
     () =>
@@ -305,6 +303,101 @@ export default function PaymentSlipGenerator() {
     await loadPageData(billingForm.billing_month)
   }
 
+  const startEditSlip = (slip) => {
+    setEditingSlip({
+      ...slip,
+      no_of_meals: String(slip.no_of_meals ?? 0),
+      meal_charge: String(slip.meal_charge ?? 0),
+      other_bills: String(slip.other_bills ?? 0),
+      fuel_and_spices: String(slip.fuel_and_spices ?? 0),
+      svc_charge: String(slip.svc_charge ?? 0),
+      hall_rent: String(slip.hall_rent ?? 0),
+      dues: String(slip.dues ?? 0),
+      status: slip.status || 'unpaid',
+    })
+  }
+
+  const saveEditedSlip = async (event) => {
+    event.preventDefault()
+    if (!editingSlip?.id) {
+      return
+    }
+
+    const noOfMeals = Number(editingSlip.no_of_meals || 0)
+    const mealCharge = Number(editingSlip.meal_charge || 0)
+    const otherBills = Number(editingSlip.other_bills || 0)
+    const fuelAndSpices = Number(editingSlip.fuel_and_spices || 0)
+    const svcCharge = Number(editingSlip.svc_charge || 0)
+    const hallRent = Number(editingSlip.hall_rent || 0)
+    const dues = Number(editingSlip.dues || 0)
+
+    if ([noOfMeals, mealCharge, otherBills, fuelAndSpices, svcCharge, hallRent, dues].some(Number.isNaN)) {
+      toast.error('Please provide valid numeric values')
+      return
+    }
+
+    const total = mealCharge + otherBills + fuelAndSpices + svcCharge + hallRent
+    const grandTotal = total + dues
+
+    setSavingSlip(true)
+
+    const { error } = await supabase
+      .from('payment_slips')
+      .update({
+        no_of_meals: noOfMeals,
+        meal_charge: mealCharge,
+        other_bills: otherBills,
+        fuel_and_spices: fuelAndSpices,
+        svc_charge: svcCharge,
+        hall_rent: hallRent,
+        total,
+        dues,
+        grand_total: grandTotal,
+        status: editingSlip.status,
+        paid_at: editingSlip.status === 'paid' ? new Date().toISOString() : null,
+      })
+      .eq('id', editingSlip.id)
+
+    if (error) {
+      toast.error(error.message || 'Failed to update payment slip')
+      setSavingSlip(false)
+      return
+    }
+
+    toast.success('Payment slip updated')
+    setSavingSlip(false)
+    setEditingSlip(null)
+    await loadPageData(billingForm.billing_month)
+  }
+
+  const deleteSlip = async (slip) => {
+    if (!slip?.id) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Delete payment slip for ${slip.students?.student_id || 'student'} (${slip.billing_month})?`,
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setDeletingSlipId(slip.id)
+
+    const { error } = await supabase.from('payment_slips').delete().eq('id', slip.id)
+
+    if (error) {
+      toast.error(error.message || 'Failed to delete payment slip')
+      setDeletingSlipId('')
+      return
+    }
+
+    toast.success('Payment slip deleted')
+    setDeletingSlipId('')
+    await loadPageData(billingForm.billing_month)
+  }
+
   const exportToExcel = () => {
     if (!slips.length) {
       toast.error('No slips available to export')
@@ -316,6 +409,7 @@ export default function PaymentSlipGenerator() {
 
       const rows = slips.map((slip, index) => ({
         'No.': index + 1,
+        'Billing Month': formatBillingMonthLabel(slip.billing_month),
         'Student ID': slip.students?.student_id || studentsMap[slip.student_id]?.student_id || '-',
         Name: slip.students?.name || studentsMap[slip.student_id]?.name || '-',
         'No of Meals': slip.no_of_meals,
@@ -394,15 +488,11 @@ export default function PaymentSlipGenerator() {
         </div>
       </form>
 
-      {selectedSlip && selectedStudent && hallInfo ? (
-        <PaymentSlipTemplate slip={selectedSlip} student={selectedStudent} hall={hallInfo} />
-      ) : null}
-
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-soft">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Generated Slips</h2>
-            <p className="text-sm text-slate-600">Billing month: {billingForm.billing_month}</p>
+            <h2 className="text-lg font-semibold text-slate-900">Monthly Payments</h2>
+            <p className="text-sm text-slate-600">All generated slips grouped by billing month.</p>
           </div>
           <button
             type="button"
@@ -419,6 +509,7 @@ export default function PaymentSlipGenerator() {
               <tr>
                 {[
                   'No.',
+                  'Billing Month',
                   'Student ID',
                   'Name',
                   'No of Meals',
@@ -442,13 +533,13 @@ export default function PaymentSlipGenerator() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={14} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={15} className="px-4 py-10 text-center text-slate-500">
                     Loading payment slips...
                   </td>
                 </tr>
               ) : slips.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={15} className="px-4 py-10 text-center text-slate-500">
                     No payment slips generated for this month yet.
                   </td>
                 </tr>
@@ -462,9 +553,10 @@ export default function PaymentSlipGenerator() {
                   return (
                     <tr
                       key={slip.id}
-                      className={`border-t border-slate-100 ${selectedSlipId === slip.id ? 'bg-blue-50/60' : ''}`}
+                      className="border-t border-slate-100"
                     >
                       <td className="px-3 py-3">{index + 1}</td>
+                      <td className="px-3 py-3">{formatBillingMonthLabel(slip.billing_month)}</td>
                       <td className="px-3 py-3 font-medium text-slate-800">{student.student_id || '-'}</td>
                       <td className="px-3 py-3">{student.name || '-'}</td>
                       <td className="px-3 py-3">{slip.no_of_meals}</td>
@@ -494,7 +586,6 @@ export default function PaymentSlipGenerator() {
                           <button
                             type="button"
                             onClick={async () => {
-                              setSelectedSlipId(slip.id)
                               await openPaymentSlipPDF(slip, student, hallInfo)
                             }}
                             className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
@@ -504,7 +595,6 @@ export default function PaymentSlipGenerator() {
                           <button
                             type="button"
                             onClick={async () => {
-                              setSelectedSlipId(slip.id)
                               await downloadPaymentSlipPDF(slip, student, hallInfo)
                             }}
                             className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
@@ -522,6 +612,22 @@ export default function PaymentSlipGenerator() {
                               {markingPaidId === slip.id ? 'Saving...' : 'Mark as Paid'}
                             </button>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => startEditSlip(slip)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                          >
+                            <Pencil className="h-3.5 w-3.5" /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteSlip(slip)}
+                            disabled={deletingSlipId === slip.id}
+                            className="inline-flex items-center gap-1 rounded-lg border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            {deletingSlipId === slip.id ? 'Deleting...' : 'Delete'}
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -533,7 +639,7 @@ export default function PaymentSlipGenerator() {
             {slips.length > 0 && (
               <tfoot className="border-t-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800">
                 <tr>
-                  <td className="px-3 py-3" colSpan={3}>
+                  <td className="px-3 py-3" colSpan={4}>
                     Total
                   </td>
                   <td className="px-3 py-3">{totals.no_of_meals}</td>
@@ -552,6 +658,79 @@ export default function PaymentSlipGenerator() {
           </table>
         </div>
       </div>
+
+      {editingSlip && (
+        <ModalShell
+          title={`Edit Payment: ${editingSlip.students?.student_id || editingSlip.student_id} (${formatBillingMonthLabel(editingSlip.billing_month)})`}
+          onClose={() => setEditingSlip(null)}
+        >
+          <form onSubmit={saveEditedSlip} className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {[
+                ['no_of_meals', 'No of Meals'],
+                ['meal_charge', 'Meal Charge'],
+                ['other_bills', 'Other Bills'],
+                ['fuel_and_spices', 'Fuel & Spices'],
+                ['svc_charge', 'SVC Charge'],
+                ['hall_rent', 'Hall Rent'],
+                ['dues', 'Dues'],
+              ].map(([fieldName, label]) => (
+                <label key={fieldName} className="block space-y-1">
+                  <span className="text-sm font-medium text-slate-700">{label}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editingSlip[fieldName]}
+                    onChange={(event) =>
+                      setEditingSlip((previous) => ({
+                        ...previous,
+                        [fieldName]: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none ring-primary focus:border-primary focus:ring-2"
+                  />
+                </label>
+              ))}
+
+              <label className="block space-y-1">
+                <span className="text-sm font-medium text-slate-700">Status</span>
+                <select
+                  value={editingSlip.status}
+                  onChange={(event) =>
+                    setEditingSlip((previous) => ({
+                      ...previous,
+                      status: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none ring-primary focus:border-primary focus:ring-2"
+                >
+                  <option value="unpaid">unpaid</option>
+                  <option value="paid">paid</option>
+                  <option value="dues">dues</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingSlip(null)}
+                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingSlip}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {savingSlip ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </ModalShell>
+      )}
     </section>
   )
 }
@@ -562,5 +741,25 @@ function Field({ label, children }) {
       <span className="text-sm font-medium text-slate-700">{label}</span>
       {children}
     </label>
+  )
+}
+
+function ModalShell({ title, onClose, children }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+      <div className="w-full max-w-3xl rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+          >
+            Close
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
   )
 }
