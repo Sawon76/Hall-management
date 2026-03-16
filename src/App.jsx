@@ -26,7 +26,6 @@ import ContactPage from './pages/student/ContactPage'
 import HelpPage from './pages/student/HelpPage'
 import StudentHome from './pages/student/StudentHome'
 import StudentProfile from './pages/student/StudentProfile'
-import StudentWeeklyMenu from './pages/student/StudentWeeklyMenu'
 import WeeklyMenuView from './pages/provost/WeeklyMenuView'
 
 const PaymentSlipGenerator = lazy(() => import('./pages/staff/PaymentSlipGenerator'))
@@ -91,7 +90,6 @@ function App() {
         >
           <Route element={<AuthLayout role={ROLES.STUDENT} />}>
             <Route path="home" element={<StudentHome />} />
-            <Route path="weekly-menu" element={<StudentWeeklyMenu />} />
             <Route path="profile" element={<StudentProfile />} />
             <Route
               path="payments"

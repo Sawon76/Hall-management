@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 
 import CalendarComponent from '../../components/calendar/CalendarComponent'
+import MealPriceCalendar from '../../components/menu/MealPriceCalendar'
 import MealTogglePanel from '../../components/calendar/MealTogglePanel'
 import DatePickerField from '../../components/ui/date-picker-field'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { STUDENT_CATEGORIES } from '../../constants'
+import { createDefaultWeeklyMenuRows, normalizeWeeklyMenuRows } from '../../constants/weeklyMenu'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuthStore } from '../../store/authStore'
 import { getDatesInRange } from '../../utils/dateUtils'
@@ -36,6 +38,11 @@ export default function StudentHome() {
   const [mealRecords, setMealRecords] = useState([])
   const [hallClosures, setHallClosures] = useState([])
   const [hallInfo, setHallInfo] = useState(null)
+  const [weeklyMenuRows, setWeeklyMenuRows] = useState(createDefaultWeeklyMenuRows())
+  const [loadingWeeklyMenu, setLoadingWeeklyMenu] = useState(true)
+  const [priceCalendarMonth, setPriceCalendarMonth] = useState(new Date())
+  const [dailyPricesMap, setDailyPricesMap] = useState({})
+  const [loadingDailyPrices, setLoadingDailyPrices] = useState(true)
   const [loading, setLoading] = useState(true)
   const [savingMeal, setSavingMeal] = useState('')
   const [savingRange, setSavingRange] = useState(false)
@@ -65,6 +72,11 @@ export default function StudentHome() {
     [hallClosures, mealRecords, studentSession?.category, visibleMonth, visibleYear],
   )
 
+  const hasAnyWeeklyMenu = useMemo(
+    () => weeklyMenuRows.some((row) => row.breakfast || row.lunch || row.dinner),
+    [weeklyMenuRows],
+  )
+
   const canEditDate = (date) => isMealDateEditable(date)
 
   const loadStudentData = async () => {
@@ -78,7 +90,9 @@ export default function StudentHome() {
     const monthStart = format(startOfMonth(visibleDate), 'yyyy-MM-dd')
     const monthEnd = format(endOfMonth(visibleDate), 'yyyy-MM-dd')
 
-    const [mealRecordsRes, hallClosuresRes, hallRes] = await Promise.all([
+    setLoadingWeeklyMenu(true)
+
+    const [mealRecordsRes, hallClosuresRes, hallRes, weeklyMenuRes] = await Promise.all([
       supabase
         .from('meal_records')
         .select('*')
@@ -96,6 +110,11 @@ export default function StudentHome() {
         .select('name, university_name')
         .eq('id', studentSession.hall_id)
         .single(),
+      supabase
+        .from('weekly_menus')
+        .select('day_of_week, day_name, breakfast, lunch, dinner')
+        .eq('hall_id', studentSession.hall_id)
+        .order('day_of_week', { ascending: true }),
     ])
 
     if (mealRecordsRes.error) {
@@ -106,15 +125,73 @@ export default function StudentHome() {
       toast.error(hallClosuresRes.error.message || 'Failed to load hall closure data')
     }
 
+    if (weeklyMenuRes.error) {
+      toast.error(weeklyMenuRes.error.message || 'Failed to load weekly menu')
+    }
+
     setMealRecords(mealRecordsRes.data ?? [])
     setHallClosures(hallClosuresRes.data ?? [])
     setHallInfo(hallRes.data ?? null)
+    setWeeklyMenuRows(normalizeWeeklyMenuRows(weeklyMenuRes.data ?? []))
+    setLoadingWeeklyMenu(false)
     setLoading(false)
   }
 
   useEffect(() => {
     loadStudentData()
   }, [studentSession?.hall_id, studentSession?.id, visibleDate])
+
+  useEffect(() => {
+    const loadDailyPrices = async () => {
+      if (!studentSession?.hall_id) {
+        setLoadingDailyPrices(false)
+        return
+      }
+
+      setLoadingDailyPrices(true)
+      const monthStart = format(startOfMonth(priceCalendarMonth), 'yyyy-MM-dd')
+      const monthEnd = format(endOfMonth(priceCalendarMonth), 'yyyy-MM-dd')
+
+      const { data, error } = await supabase
+        .from('meal_daily_prices')
+        .select('date, breakfast_price, lunch_price, dinner_price')
+        .eq('hall_id', studentSession.hall_id)
+        .gte('date', monthStart)
+        .lte('date', monthEnd)
+
+      if (error) {
+        toast.error(error.message || 'Failed to load daily meal prices')
+        setDailyPricesMap({})
+        setLoadingDailyPrices(false)
+        return
+      }
+
+      const toDisplayPrice = (value) => {
+        const numeric = Number(value ?? 0)
+        if (Number.isNaN(numeric)) {
+          return '0'
+        }
+
+        if (Number.isInteger(numeric)) {
+          return String(numeric)
+        }
+
+        return numeric.toFixed(2).replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1')
+      }
+
+      const map = Object.fromEntries(
+        (data ?? []).map((row) => [
+          row.date,
+          `${toDisplayPrice(row.breakfast_price)}|${toDisplayPrice(row.lunch_price)}|${toDisplayPrice(row.dinner_price)}`,
+        ]),
+      )
+
+      setDailyPricesMap(map)
+      setLoadingDailyPrices(false)
+    }
+
+    loadDailyPrices()
+  }, [priceCalendarMonth, studentSession?.hall_id])
 
   const upsertMealState = async (date, nextMealState) => {
     const payload = {
@@ -348,6 +425,49 @@ export default function StudentHome() {
           savingMeal={savingMeal}
         />
       </div>
+
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-soft">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <h2 className="text-lg font-semibold text-slate-900">Weekly Menu</h2>
+          <p className="mt-1 text-sm text-slate-600">This menu repeats every week until staff updates it.</p>
+        </div>
+        <table className="min-w-full text-left text-sm">
+          <thead className="bg-slate-50 text-slate-700">
+            <tr>
+              {['Day', 'Breakfast', 'Lunch', 'Dinner'].map((heading) => (
+                <th key={heading} className="px-4 py-3 font-semibold whitespace-nowrap">{heading}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loadingWeeklyMenu ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-10 text-center text-slate-500">Loading weekly menu...</td>
+              </tr>
+            ) : !hasAnyWeeklyMenu ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-10 text-center text-slate-500">No weekly menu configured yet by staff.</td>
+              </tr>
+            ) : (
+              weeklyMenuRows.map((row) => (
+                <tr key={row.day_of_week} className="border-t border-slate-100">
+                  <td className="px-4 py-3 font-semibold text-slate-800">{row.day_name}</td>
+                  <td className="px-4 py-3">{row.breakfast || '-'}</td>
+                  <td className="px-4 py-3">{row.lunch || '-'}</td>
+                  <td className="px-4 py-3">{row.dinner || '-'}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <MealPriceCalendar
+        month={priceCalendarMonth}
+        onMonthChange={setPriceCalendarMonth}
+        priceByDate={dailyPricesMap}
+        loading={loadingDailyPrices}
+      />
     </section>
   )
 }
