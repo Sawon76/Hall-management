@@ -72,6 +72,9 @@ export default function PaymentSlipGenerator() {
   const [editingSlip, setEditingSlip] = useState(null)
   const [savingSlip, setSavingSlip] = useState(false)
   const [deletingSlipId, setDeletingSlipId] = useState('')
+  const [deletingSelected, setDeletingSelected] = useState(false)
+  const [monthFilter, setMonthFilter] = useState('all')
+  const [selectedSlipIds, setSelectedSlipIds] = useState([])
 
   const loadPageData = async (billingMonth = billingForm.billing_month) => {
     if (!user?.hall_id) {
@@ -143,9 +146,19 @@ export default function PaymentSlipGenerator() {
     [students],
   )
 
+  const monthOptions = useMemo(() => {
+    const uniqueMonths = [...new Set(slips.map((slip) => slip.billing_month).filter(Boolean))]
+    return ['all', ...uniqueMonths]
+  }, [slips])
+
+  const filteredSlips = useMemo(
+    () => (monthFilter === 'all' ? slips : slips.filter((slip) => slip.billing_month === monthFilter)),
+    [monthFilter, slips],
+  )
+
   const totals = useMemo(
     () =>
-      slips.reduce(
+      filteredSlips.reduce(
         (accumulator, slip) => ({
           no_of_meals: accumulator.no_of_meals + Number(slip.no_of_meals || 0),
           meal_charge: accumulator.meal_charge + Number(slip.meal_charge || 0),
@@ -169,8 +182,64 @@ export default function PaymentSlipGenerator() {
           grand_total: 0,
         },
       ),
-    [slips],
+    [filteredSlips],
   )
+
+  useEffect(() => {
+    setSelectedSlipIds([])
+  }, [monthFilter])
+
+  const allFilteredSelected =
+    filteredSlips.length > 0 && filteredSlips.every((slip) => selectedSlipIds.includes(slip.id))
+
+  const toggleSelectAllFiltered = () => {
+    if (allFilteredSelected) {
+      setSelectedSlipIds((previous) =>
+        previous.filter((id) => !filteredSlips.some((slip) => slip.id === id)),
+      )
+      return
+    }
+
+    setSelectedSlipIds((previous) => {
+      const next = new Set(previous)
+      filteredSlips.forEach((slip) => next.add(slip.id))
+      return [...next]
+    })
+  }
+
+  const toggleSelectSlip = (slipId) => {
+    setSelectedSlipIds((previous) =>
+      previous.includes(slipId)
+        ? previous.filter((id) => id !== slipId)
+        : [...previous, slipId],
+    )
+  }
+
+  const deleteSelectedSlips = async () => {
+    if (selectedSlipIds.length === 0) {
+      return
+    }
+
+    const confirmed = window.confirm(`Delete ${selectedSlipIds.length} selected payment slips?`)
+    if (!confirmed) {
+      return
+    }
+
+    setDeletingSelected(true)
+
+    const { error } = await supabase.from('payment_slips').delete().in('id', selectedSlipIds)
+
+    if (error) {
+      toast.error(error.message || 'Failed to delete selected payment slips')
+      setDeletingSelected(false)
+      return
+    }
+
+    toast.success(`${selectedSlipIds.length} payment slips deleted`)
+    setSelectedSlipIds([])
+    setDeletingSelected(false)
+    await loadPageData(billingForm.billing_month)
+  }
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -494,13 +563,40 @@ export default function PaymentSlipGenerator() {
             <h2 className="text-lg font-semibold text-slate-900">Monthly Payments</h2>
             <p className="text-sm text-slate-600">All generated slips grouped by billing month.</p>
           </div>
-          <button
-            type="button"
-            onClick={exportToExcel}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-          >
-            <Download className="h-4 w-4" /> Export to Excel
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+              <span>Filter month</span>
+              <select
+                value={monthFilter}
+                onChange={(event) => setMonthFilter(event.target.value)}
+                className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none ring-primary focus:border-primary focus:ring-2"
+              >
+                {monthOptions.map((month) => (
+                  <option key={month} value={month}>
+                    {month === 'all' ? 'All Months' : formatBillingMonthLabel(month)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <button
+              type="button"
+              onClick={deleteSelectedSlips}
+              disabled={selectedSlipIds.length === 0 || deletingSelected}
+              className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              <Trash2 className="h-4 w-4" />
+              {deletingSelected ? 'Deleting...' : `Delete Selected (${selectedSlipIds.length})`}
+            </button>
+
+            <button
+              type="button"
+              onClick={exportToExcel}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              <Download className="h-4 w-4" /> Export to Excel
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -508,6 +604,7 @@ export default function PaymentSlipGenerator() {
             <thead className="bg-slate-50 text-slate-600">
               <tr>
                 {[
+                  'Select',
                   'No.',
                   'Billing Month',
                   'Student ID',
@@ -525,7 +622,16 @@ export default function PaymentSlipGenerator() {
                   'Actions',
                 ].map((heading) => (
                   <th key={heading} className="px-3 py-3 font-semibold whitespace-nowrap">
-                    {heading}
+                    {heading === 'Select' ? (
+                      <input
+                        type="checkbox"
+                        checked={allFilteredSelected}
+                        onChange={toggleSelectAllFiltered}
+                        aria-label="Select all filtered rows"
+                      />
+                    ) : (
+                      heading
+                    )}
                   </th>
                 ))}
               </tr>
@@ -533,18 +639,18 @@ export default function PaymentSlipGenerator() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={15} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={16} className="px-4 py-10 text-center text-slate-500">
                     Loading payment slips...
                   </td>
                 </tr>
-              ) : slips.length === 0 ? (
+              ) : filteredSlips.length === 0 ? (
                 <tr>
-                  <td colSpan={15} className="px-4 py-10 text-center text-slate-500">
-                    No payment slips generated for this month yet.
+                  <td colSpan={16} className="px-4 py-10 text-center text-slate-500">
+                    No payment slips found for the selected filter.
                   </td>
                 </tr>
               ) : (
-                slips.map((slip, index) => {
+                filteredSlips.map((slip, index) => {
                   const student = {
                     ...studentsMap[slip.student_id],
                     ...slip.students,
@@ -555,6 +661,14 @@ export default function PaymentSlipGenerator() {
                       key={slip.id}
                       className="border-t border-slate-100"
                     >
+                      <td className="px-3 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedSlipIds.includes(slip.id)}
+                          onChange={() => toggleSelectSlip(slip.id)}
+                          aria-label={`Select slip ${slip.id}`}
+                        />
+                      </td>
                       <td className="px-3 py-3">{index + 1}</td>
                       <td className="px-3 py-3">{formatBillingMonthLabel(slip.billing_month)}</td>
                       <td className="px-3 py-3 font-medium text-slate-800">{student.student_id || '-'}</td>
@@ -636,10 +750,10 @@ export default function PaymentSlipGenerator() {
               )}
             </tbody>
 
-            {slips.length > 0 && (
+            {filteredSlips.length > 0 && (
               <tfoot className="border-t-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800">
                 <tr>
-                  <td className="px-3 py-3" colSpan={4}>
+                  <td className="px-3 py-3" colSpan={5}>
                     Total
                   </td>
                   <td className="px-3 py-3">{totals.no_of_meals}</td>
