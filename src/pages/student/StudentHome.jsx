@@ -1,10 +1,11 @@
-import { addMonths, endOfMonth, format, startOfMonth, subMonths } from 'date-fns'
+import { endOfMonth, format, startOfMonth } from 'date-fns'
 import { CalendarDays, Info, Save } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 
 import CalendarComponent from '../../components/calendar/CalendarComponent'
 import MealTogglePanel from '../../components/calendar/MealTogglePanel'
+import DatePickerField from '../../components/ui/date-picker-field'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { STUDENT_CATEGORIES } from '../../constants'
 import { supabase } from '../../lib/supabaseClient'
@@ -63,6 +64,8 @@ export default function StudentHome() {
       ),
     [hallClosures, mealRecords, studentSession?.category, visibleMonth, visibleYear],
   )
+
+  const canEditDate = (date) => isMealDateEditable(date)
 
   const loadStudentData = async () => {
     if (!studentSession?.id || !studentSession?.hall_id) {
@@ -249,33 +252,37 @@ export default function StudentHome() {
         </div>
 
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
-          <label className="flex-1 space-y-1">
-            <span className="text-sm font-medium text-slate-700">From</span>
-            <input
-              type="date"
-              value={rangeForm.fromDate}
-              min={format(mealEditWindow.firstEditableDate, 'yyyy-MM-dd')}
-              max={format(mealEditWindow.lastEditableDate, 'yyyy-MM-dd')}
-              onChange={(event) =>
-                setRangeForm((previous) => ({ ...previous, fromDate: event.target.value }))
-              }
-              className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none ring-primary focus:border-primary focus:ring-2"
-            />
-          </label>
+          <DatePickerField
+            label="From"
+            value={rangeForm.fromDate}
+            minDate={mealEditWindow.firstEditableDate}
+            maxDate={rangeForm.toDate ? new Date(rangeForm.toDate) : mealEditWindow.lastEditableDate}
+            isDateDisabled={(date) => !canEditDate(date)}
+            disabled={!mealEditWindow.hasEditableDates}
+            onChange={(nextDate) =>
+              setRangeForm((previous) => ({
+                ...previous,
+                fromDate: nextDate,
+                toDate: previous.toDate && previous.toDate < nextDate ? nextDate : previous.toDate,
+              }))
+            }
+          />
 
-          <label className="flex-1 space-y-1">
-            <span className="text-sm font-medium text-slate-700">To</span>
-            <input
-              type="date"
-              value={rangeForm.toDate}
-              min={format(mealEditWindow.firstEditableDate, 'yyyy-MM-dd')}
-              max={format(mealEditWindow.lastEditableDate, 'yyyy-MM-dd')}
-              onChange={(event) =>
-                setRangeForm((previous) => ({ ...previous, toDate: event.target.value }))
-              }
-              className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none ring-primary focus:border-primary focus:ring-2"
-            />
-          </label>
+          <DatePickerField
+            label="To"
+            value={rangeForm.toDate}
+            minDate={rangeForm.fromDate ? new Date(rangeForm.fromDate) : mealEditWindow.firstEditableDate}
+            maxDate={mealEditWindow.lastEditableDate}
+            isDateDisabled={(date) => !canEditDate(date)}
+            disabled={!mealEditWindow.hasEditableDates}
+            onChange={(nextDate) =>
+              setRangeForm((previous) => ({
+                ...previous,
+                toDate: nextDate,
+                fromDate: previous.fromDate && previous.fromDate > nextDate ? nextDate : previous.fromDate,
+              }))
+            }
+          />
 
           <div className="flex-1 space-y-1">
             <span className="text-sm font-medium text-slate-700">Mode</span>

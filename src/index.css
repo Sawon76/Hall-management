@@ -6,6 +6,23 @@
 
 @layer base {
   :root {
+    --background: 210 40% 98%;
+    --foreground: 215 28% 17%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 17%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 199 58% 43%;
+    --primary: 212 52% 25%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 199 58% 43%;
+    --secondary-foreground: 210 40% 98%;
+    --accent: 36 91% 56%;
+    --accent-foreground: 215 28% 17%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
     color: #0f172a;
     background-color: #f8fafc;
     font-family: 'Inter', sans-serif;
