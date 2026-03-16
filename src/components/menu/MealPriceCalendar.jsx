@@ -1,7 +1,19 @@
-import { addMonths, eachDayOfInterval, endOfWeek, format, isSameMonth, startOfWeek, subMonths } from 'date-fns'
+import {
+  addMonths,
+  eachDayOfInterval,
+  endOfWeek,
+  format,
+  isBefore,
+  isSameMonth,
+  isToday,
+  startOfDay,
+  startOfWeek,
+  subMonths,
+} from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 export default function MealPriceCalendar({ month, onMonthChange, priceByDate = {}, loading = false }) {
+  const todayStart = startOfDay(new Date())
   const monthStart = new Date(month.getFullYear(), month.getMonth(), 1)
   const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0)
   const gridStart = startOfWeek(monthStart)
@@ -42,18 +54,31 @@ export default function MealPriceCalendar({ month, onMonthChange, priceByDate = 
         {calendarDays.map((date) => {
           const dateKey = format(date, 'yyyy-MM-dd')
           const priceLabel = priceByDate[dateKey] || '0|0|0'
+          const displayPriceLabel = priceLabel.split('|').join(' | ')
           const inMonth = isSameMonth(date, month)
+          const pastDate = isBefore(startOfDay(date), todayStart)
+          const today = isToday(date)
+
+          const cellClassName = !inMonth
+            ? 'border-slate-100 bg-slate-50/60 opacity-45'
+            : today
+              ? 'border-blue-300 bg-blue-50 ring-2 ring-blue-200'
+              : pastDate
+                ? 'border-slate-200 bg-slate-100 text-slate-400'
+                : 'border-slate-200 bg-slate-50'
 
           return (
             <div
               key={dateKey}
-              className={`min-h-20 rounded-xl border p-2 ${
-                inMonth ? 'border-slate-200 bg-slate-50' : 'border-slate-100 bg-slate-50/60 opacity-50'
-              }`}
+              className={`min-h-20 rounded-xl border p-2 transition ${cellClassName}`}
             >
-              <p className="text-xs font-semibold text-slate-700">{format(date, 'd')}</p>
-              <p className="mt-2 text-[11px] font-semibold text-slate-900">{loading ? '...' : priceLabel}</p>
-              <p className="mt-1 text-[10px] text-slate-500">B|L|D</p>
+              <p className={`text-xs font-semibold ${today ? 'text-blue-700' : 'text-slate-700'}`}>{format(date, 'd')}</p>
+              <p className={`mt-2 text-[12px] font-bold ${pastDate && inMonth ? 'text-slate-500' : 'text-slate-900'}`}>
+                {loading ? '...' : displayPriceLabel}
+              </p>
+              <p className={`mt-1 text-[10px] font-bold tracking-[0.12em] ${pastDate && inMonth ? 'text-slate-400' : 'text-slate-600'}`}>
+                B | L | D
+              </p>
             </div>
           )
         })}
