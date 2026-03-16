@@ -25,6 +25,7 @@ const formatBillingMonthLabel = (billingMonth) => {
 
 export default function StudentPayments() {
   const studentSession = useAuthStore((state) => state.studentSession)
+  const currentMonth = format(new Date(), 'yyyy-MM')
 
   const [slips, setSlips] = useState([])
   const [availableMonths, setAvailableMonths] = useState([])
@@ -70,11 +71,17 @@ export default function StudentPayments() {
       toast.error(billingRes.error.message || 'Failed to load billing months')
     }
 
-    const monthsFromSlips = (slipsRes.data ?? []).map((slip) => slip.billing_month).filter(Boolean)
+    const monthsFromSlips = (slipsRes.data ?? [])
+      .map((slip) => slip.billing_month)
+      .filter((month) => month && month < currentMonth)
     const monthsFromConfigs = (billingRes.data ?? []).map((item) => item.billing_month).filter(Boolean)
-    const mergedMonths = [...new Set([...monthsFromSlips, ...monthsFromConfigs])]
+    const mergedMonths = [...new Set([...monthsFromSlips, ...monthsFromConfigs.filter((month) => month < currentMonth)])]
 
-    setSlips(slipsRes.data ?? [])
+    const eligibleSlips = (slipsRes.data ?? []).filter((slip) =>
+      Boolean(slip.billing_month) && slip.billing_month < currentMonth,
+    )
+
+    setSlips(eligibleSlips)
     setAvailableMonths(mergedMonths)
     setStudentInfo(
       studentProfile
