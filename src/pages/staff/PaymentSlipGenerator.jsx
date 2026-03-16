@@ -14,7 +14,9 @@ import { formatMoney, generateAllSlips } from '../../utils/paymentUtils'
 
 const INITIAL_FORM = {
   billing_month: format(subMonths(new Date(), 1), 'yyyy-MM'),
-  total_meal_charge: '',
+  breakfast_meal_charge: '',
+  lunch_meal_charge: '',
+  dinner_meal_charge: '',
   other_bills: '0',
   fuel_and_spices: '0',
   svc_charge: '0',
@@ -22,7 +24,9 @@ const INITIAL_FORM = {
 }
 
 const numberFields = [
-  'total_meal_charge',
+  'breakfast_meal_charge',
+  'lunch_meal_charge',
+  'dinner_meal_charge',
   'other_bills',
   'fuel_and_spices',
   'svc_charge',
@@ -30,8 +34,16 @@ const numberFields = [
 ]
 
 const getBillingFieldLabel = (fieldName) => {
-  if (fieldName === 'total_meal_charge') {
-    return 'Total Meal Charge'
+  if (fieldName === 'breakfast_meal_charge') {
+    return 'Breakfast Meal Charge Per Meal'
+  }
+
+  if (fieldName === 'lunch_meal_charge') {
+    return 'Lunch Meal Charge Per Meal'
+  }
+
+  if (fieldName === 'dinner_meal_charge') {
+    return 'Dinner Meal Charge Per Meal'
   }
 
   return fieldName.replaceAll('_', ' ').replace(/\b\w/g, (character) => character.toUpperCase())
@@ -99,7 +111,9 @@ export default function PaymentSlipGenerator() {
     if (configRes.data) {
       setBillingForm({
         billing_month: configRes.data.billing_month,
-        total_meal_charge: String(configRes.data.total_meal_charge ?? configRes.data.meal_charge_per_meal ?? ''),
+        breakfast_meal_charge: String(configRes.data.breakfast_meal_charge ?? configRes.data.meal_charge_per_meal ?? ''),
+        lunch_meal_charge: String(configRes.data.lunch_meal_charge ?? configRes.data.meal_charge_per_meal ?? ''),
+        dinner_meal_charge: String(configRes.data.dinner_meal_charge ?? configRes.data.meal_charge_per_meal ?? ''),
         other_bills: String(configRes.data.other_bills ?? 0),
         fuel_and_spices: String(configRes.data.fuel_and_spices ?? 0),
         svc_charge: String(configRes.data.svc_charge ?? 0),
@@ -168,8 +182,13 @@ export default function PaymentSlipGenerator() {
   const generateSlips = async (event) => {
     event.preventDefault()
 
-    if (!billingForm.billing_month || !billingForm.total_meal_charge) {
-      toast.error('Billing month and total meal charge are required')
+    if (
+      !billingForm.billing_month ||
+      !billingForm.breakfast_meal_charge ||
+      !billingForm.lunch_meal_charge ||
+      !billingForm.dinner_meal_charge
+    ) {
+      toast.error('Billing month and meal charge per meal for breakfast, lunch and dinner are required')
       return
     }
 
@@ -188,7 +207,9 @@ export default function PaymentSlipGenerator() {
     const billingConfig = {
       hall_id: user.hall_id,
       billing_month: billingForm.billing_month,
-      total_meal_charge: Number(billingForm.total_meal_charge),
+      breakfast_meal_charge: Number(billingForm.breakfast_meal_charge),
+      lunch_meal_charge: Number(billingForm.lunch_meal_charge),
+      dinner_meal_charge: Number(billingForm.dinner_meal_charge),
       other_bills: Number(billingForm.other_bills || 0),
       fuel_and_spices: Number(billingForm.fuel_and_spices || 0),
       svc_charge: Number(billingForm.svc_charge || 0),

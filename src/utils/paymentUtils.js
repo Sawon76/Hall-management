@@ -1,6 +1,6 @@
 import { compareAsc, format, parse } from 'date-fns'
 
-import { calculateMealsForMonth } from './mealUtils'
+import { calculateMealBreakdownForMonth } from './mealUtils'
 
 export const parseBillingMonth = (billingMonth) => parse(billingMonth, 'yyyy-MM', new Date())
 
@@ -42,7 +42,7 @@ export const generateAllSlips = (
   const studentMealsMap = new Map(
     students.map((student) => {
       const studentMealRecords = allMealRecords.filter((record) => record.student_id === student.id)
-      const noOfMeals = calculateMealsForMonth(
+      const mealBreakdown = calculateMealBreakdownForMonth(
         year,
         monthIndex,
         studentMealRecords,
@@ -50,21 +50,27 @@ export const generateAllSlips = (
         student.category,
       )
 
-      return [student.id, noOfMeals]
+      return [student.id, mealBreakdown]
     }),
   )
 
-  const totalMealsForHall = students.reduce(
-    (sum, student) => sum + Number(studentMealsMap.get(student.id) || 0),
-    0,
-  )
-
-  const totalMealCharge = toNumber(billingConfig.total_meal_charge)
-  const perMealRate = totalMealsForHall > 0 ? totalMealCharge / totalMealsForHall : 0
+  const breakfastRate = toNumber(billingConfig.breakfast_meal_charge)
+  const lunchRate = toNumber(billingConfig.lunch_meal_charge)
+  const dinnerRate = toNumber(billingConfig.dinner_meal_charge)
 
   return students.map((student) => {
-    const noOfMeals = Number(studentMealsMap.get(student.id) || 0)
-    const mealCharge = roundMoney(noOfMeals * perMealRate)
+    const mealBreakdown = studentMealsMap.get(student.id) || {
+      breakfast: 0,
+      lunch: 0,
+      dinner: 0,
+      total: 0,
+    }
+    const noOfMeals = Number(mealBreakdown.total || 0)
+    const mealCharge = roundMoney(
+      Number(mealBreakdown.breakfast || 0) * breakfastRate +
+        Number(mealBreakdown.lunch || 0) * lunchRate +
+        Number(mealBreakdown.dinner || 0) * dinnerRate,
+    )
     const otherBills = toNumber(billingConfig.other_bills)
     const fuelAndSpices = toNumber(billingConfig.fuel_and_spices)
     const svcCharge = toNumber(billingConfig.svc_charge)

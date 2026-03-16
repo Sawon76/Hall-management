@@ -27,6 +27,27 @@ $$;
 ALTER TABLE IF EXISTS public.billing_configs
   ADD COLUMN IF NOT EXISTS total_meal_charge NUMERIC;
 
+ALTER TABLE IF EXISTS public.billing_configs
+  ADD COLUMN IF NOT EXISTS breakfast_meal_charge NUMERIC;
+
+ALTER TABLE IF EXISTS public.billing_configs
+  ADD COLUMN IF NOT EXISTS lunch_meal_charge NUMERIC;
+
+ALTER TABLE IF EXISTS public.billing_configs
+  ADD COLUMN IF NOT EXISTS dinner_meal_charge NUMERIC;
+
+UPDATE public.billing_configs
+SET breakfast_meal_charge = COALESCE(breakfast_meal_charge, 0)
+WHERE breakfast_meal_charge IS NULL;
+
+UPDATE public.billing_configs
+SET lunch_meal_charge = COALESCE(lunch_meal_charge, 0)
+WHERE lunch_meal_charge IS NULL;
+
+UPDATE public.billing_configs
+SET dinner_meal_charge = COALESCE(dinner_meal_charge, 0)
+WHERE dinner_meal_charge IS NULL;
+
 ALTER TABLE IF EXISTS public.payment_slips
   ADD COLUMN IF NOT EXISTS dues_months TEXT[] DEFAULT '{}';
 
