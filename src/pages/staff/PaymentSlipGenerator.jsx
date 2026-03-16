@@ -210,6 +210,11 @@ export default function PaymentSlipGenerator() {
       breakfast_meal_charge: Number(billingForm.breakfast_meal_charge),
       lunch_meal_charge: Number(billingForm.lunch_meal_charge),
       dinner_meal_charge: Number(billingForm.dinner_meal_charge),
+      // Backward compatibility for older DBs where total_meal_charge still exists and is NOT NULL.
+      total_meal_charge:
+        Number(billingForm.breakfast_meal_charge) +
+        Number(billingForm.lunch_meal_charge) +
+        Number(billingForm.dinner_meal_charge),
       other_bills: Number(billingForm.other_bills || 0),
       fuel_and_spices: Number(billingForm.fuel_and_spices || 0),
       svc_charge: Number(billingForm.svc_charge || 0),

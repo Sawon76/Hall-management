@@ -27,6 +27,28 @@ $$;
 ALTER TABLE IF EXISTS public.billing_configs
   ADD COLUMN IF NOT EXISTS total_meal_charge NUMERIC;
 
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'billing_configs'
+      AND column_name = 'total_meal_charge'
+  ) THEN
+    UPDATE public.billing_configs
+    SET total_meal_charge = 0
+    WHERE total_meal_charge IS NULL;
+
+    ALTER TABLE public.billing_configs
+      ALTER COLUMN total_meal_charge SET DEFAULT 0;
+
+    ALTER TABLE public.billing_configs
+      ALTER COLUMN total_meal_charge DROP NOT NULL;
+  END IF;
+END
+$$;
+
 ALTER TABLE IF EXISTS public.billing_configs
   ADD COLUMN IF NOT EXISTS breakfast_meal_charge NUMERIC;
 
