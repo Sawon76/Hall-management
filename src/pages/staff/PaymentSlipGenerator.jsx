@@ -1,4 +1,4 @@
-import { endOfMonth, format, startOfMonth } from 'date-fns'
+import { endOfMonth, format, startOfMonth, subMonths } from 'date-fns'
 import { Check, Download, Eye, FileSpreadsheet } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
@@ -39,6 +39,8 @@ const getBillingFieldLabel = (fieldName) => {
 
 export default function PaymentSlipGenerator() {
   const user = useAuthStore((state) => state.user)
+  const currentMonth = format(new Date(), 'yyyy-MM')
+  const latestAllowedMonth = format(subMonths(new Date(), 1), 'yyyy-MM')
 
   const [billingForm, setBillingForm] = useState(INITIAL_FORM)
   const [hallInfo, setHallInfo] = useState(null)
@@ -168,6 +170,11 @@ export default function PaymentSlipGenerator() {
 
     if (!billingForm.billing_month || !billingForm.total_meal_charge) {
       toast.error('Billing month and total meal charge are required')
+      return
+    }
+
+    if (billingForm.billing_month >= currentMonth) {
+      toast.error(`You can only generate slips up to ${latestAllowedMonth}`)
       return
     }
 
@@ -321,6 +328,7 @@ export default function PaymentSlipGenerator() {
               name="billing_month"
               value={billingForm.billing_month}
               onChange={handleChange}
+              max={latestAllowedMonth}
               className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none ring-primary focus:border-primary focus:ring-2"
             />
           </Field>

@@ -251,6 +251,33 @@ REVOKE ALL ON FUNCTION public.student_exists(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.student_exists(UUID) TO anon;
 GRANT EXECUTE ON FUNCTION public.student_exists(UUID) TO authenticated;
 
+CREATE OR REPLACE FUNCTION public.enforce_previous_billing_month()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  current_month TEXT := to_char(date_trunc('month', now()), 'YYYY-MM');
+BEGIN
+  IF NEW.billing_month IS NULL OR NEW.billing_month >= current_month THEN
+    RAISE EXCEPTION 'Billing month must be before the current month (%). Received: %', current_month, NEW.billing_month;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_billing_configs_previous_month_only ON public.billing_configs;
+CREATE TRIGGER trg_billing_configs_previous_month_only
+BEFORE INSERT OR UPDATE OF billing_month ON public.billing_configs
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_previous_billing_month();
+
+DROP TRIGGER IF EXISTS trg_payment_slips_previous_month_only ON public.payment_slips;
+CREATE TRIGGER trg_payment_slips_previous_month_only
+BEFORE INSERT OR UPDATE OF billing_month ON public.payment_slips
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_previous_billing_month();
+
 ALTER TABLE halls ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;
@@ -340,6 +367,12 @@ CREATE POLICY auth_manage_meals ON meal_records
     (
       auth.role() = 'authenticated'
       AND public.get_my_role() IN ('provost', 'staff')
+      AND EXISTS (
+        SELECT 1
+        FROM public.students s
+        WHERE s.id = meal_records.student_id
+          AND s.hall_id = public.get_my_hall_id()
+      )
     )
     OR public.student_exists(meal_records.student_id)
   )
@@ -347,6 +380,12 @@ CREATE POLICY auth_manage_meals ON meal_records
     (
       auth.role() = 'authenticated'
       AND public.get_my_role() IN ('provost', 'staff')
+      AND EXISTS (
+        SELECT 1
+        FROM public.students s
+        WHERE s.id = meal_records.student_id
+          AND s.hall_id = public.get_my_hall_id()
+      )
     )
     OR public.student_exists(meal_records.student_id)
   );
@@ -358,6 +397,7 @@ CREATE POLICY auth_manage_slips ON payment_slips
     (
       auth.role() = 'authenticated'
       AND public.get_my_role() IN ('provost', 'staff')
+      AND payment_slips.hall_id = public.get_my_hall_id()
     )
     OR public.student_exists(payment_slips.student_id)
   )
@@ -365,6 +405,7 @@ CREATE POLICY auth_manage_slips ON payment_slips
     (
       auth.role() = 'authenticated'
       AND public.get_my_role() IN ('provost', 'staff')
+      AND payment_slips.hall_id = public.get_my_hall_id()
     )
     OR public.student_exists(payment_slips.student_id)
   );
