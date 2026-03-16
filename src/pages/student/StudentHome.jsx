@@ -256,7 +256,7 @@ export default function StudentHome() {
             label="From"
             value={rangeForm.fromDate}
             minDate={mealEditWindow.firstEditableDate}
-            maxDate={rangeForm.toDate ? new Date(rangeForm.toDate) : mealEditWindow.lastEditableDate}
+            maxDate={mealEditWindow.lastEditableDate}
             isDateDisabled={(date) => !canEditDate(date)}
             disabled={!mealEditWindow.hasEditableDates}
             onChange={(nextDate) =>
