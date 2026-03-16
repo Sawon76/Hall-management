@@ -20,11 +20,14 @@ import StaffCreateAccount from './pages/staff/StaffCreateAccount'
 import StaffDashboard from './pages/staff/StaffDashboard'
 import StaffHallClosure from './pages/staff/StaffHallClosure'
 import StaffPaymentHistory from './pages/staff/StaffPaymentHistory'
+import WeeklyMenuManager from './pages/staff/WeeklyMenuManager'
 import ChangePassword from './pages/student/ChangePassword'
 import ContactPage from './pages/student/ContactPage'
 import HelpPage from './pages/student/HelpPage'
 import StudentHome from './pages/student/StudentHome'
 import StudentProfile from './pages/student/StudentProfile'
+import StudentWeeklyMenu from './pages/student/StudentWeeklyMenu'
+import WeeklyMenuView from './pages/provost/WeeklyMenuView'
 
 const PaymentSlipGenerator = lazy(() => import('./pages/staff/PaymentSlipGenerator'))
 const StudentPayments = lazy(() => import('./pages/student/StudentPayments'))
@@ -51,6 +54,7 @@ function App() {
             <Route path="dashboard" element={<ProvostDashboard />} />
             <Route path="create-account" element={<CreateStudentAccount />} />
             <Route path="accounts" element={<ViewAccountsPasswords />} />
+            <Route path="weekly-menu" element={<WeeklyMenuView />} />
             <Route path="hall-closure" element={<HallClosureSchedule />} />
             <Route path="payment-history" element={<PaymentHistory />} />
           </Route>
@@ -72,6 +76,7 @@ function App() {
                 </Suspense>
               }
             />
+            <Route path="weekly-menu" element={<WeeklyMenuManager />} />
             <Route path="hall-closure" element={<StaffHallClosure />} />
             <Route path="payment-history" element={<StaffPaymentHistory />} />
           </Route>
@@ -86,6 +91,7 @@ function App() {
         >
           <Route element={<AuthLayout role={ROLES.STUDENT} />}>
             <Route path="home" element={<StudentHome />} />
+            <Route path="weekly-menu" element={<StudentWeeklyMenu />} />
             <Route path="profile" element={<StudentProfile />} />
             <Route
               path="payments"

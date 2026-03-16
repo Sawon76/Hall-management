@@ -1,4 +1,4 @@
-import { CalendarOff, FileSpreadsheet, History, LayoutDashboard, UserPlus, X } from 'lucide-react'
+import { CalendarOff, FileSpreadsheet, History, LayoutDashboard, NotebookTabs, UserPlus, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 import { useUiStore } from '../../store/uiStore'
@@ -7,6 +7,7 @@ const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, route: '/staff/dashboard' },
   { label: 'Create Account', icon: UserPlus, route: '/staff/create-account' },
   { label: 'Payment Generator', icon: FileSpreadsheet, route: '/staff/payment-generator' },
+  { label: 'Weekly Menu', icon: NotebookTabs, route: '/staff/weekly-menu' },
   { label: 'Hall Closure', icon: CalendarOff, route: '/staff/hall-closure' },
   { label: 'Payment History', icon: History, route: '/staff/payment-history' },
 ]

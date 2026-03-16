@@ -73,6 +73,34 @@ WHERE dinner_meal_charge IS NULL;
 ALTER TABLE IF EXISTS public.payment_slips
   ADD COLUMN IF NOT EXISTS dues_months TEXT[] DEFAULT '{}';
 
+CREATE TABLE IF NOT EXISTS public.weekly_menus (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  hall_id UUID REFERENCES public.halls(id) ON DELETE CASCADE NOT NULL,
+  day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+  day_name TEXT NOT NULL,
+  breakfast TEXT DEFAULT '',
+  lunch TEXT DEFAULT '',
+  dinner TEXT DEFAULT '',
+  updated_by UUID REFERENCES public.profiles(id),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(hall_id, day_of_week)
+);
+
+CREATE TABLE IF NOT EXISTS public.meal_daily_prices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  hall_id UUID REFERENCES public.halls(id) ON DELETE CASCADE NOT NULL,
+  date DATE NOT NULL,
+  breakfast_price NUMERIC NOT NULL DEFAULT 0,
+  lunch_price NUMERIC NOT NULL DEFAULT 0,
+  dinner_price NUMERIC NOT NULL DEFAULT 0,
+  updated_by UUID REFERENCES public.profiles(id),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(hall_id, date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_weekly_menus_hall_day ON public.weekly_menus(hall_id, day_of_week);
+CREATE INDEX IF NOT EXISTS idx_meal_daily_prices_hall_date ON public.meal_daily_prices(hall_id, date);
+
 CREATE OR REPLACE FUNCTION public.student_login(
   p_student_id TEXT,
   p_hall_id UUID,
@@ -254,6 +282,9 @@ BEFORE INSERT OR UPDATE OF billing_month ON public.payment_slips
 FOR EACH ROW
 EXECUTE FUNCTION public.enforce_previous_billing_month();
 
+ALTER TABLE IF EXISTS public.weekly_menus ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.meal_daily_prices ENABLE ROW LEVEL SECURITY;
+
 DO $$
 DECLARE
   policy_record RECORD;
@@ -360,6 +391,44 @@ CREATE POLICY auth_manage_slips ON public.payment_slips
       AND payment_slips.hall_id = public.get_my_hall_id()
     )
     OR public.student_exists(payment_slips.student_id)
+  );
+
+DROP POLICY IF EXISTS public_read_weekly_menus ON public.weekly_menus;
+CREATE POLICY public_read_weekly_menus ON public.weekly_menus
+  FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS staff_manage_weekly_menus ON public.weekly_menus;
+CREATE POLICY staff_manage_weekly_menus ON public.weekly_menus
+  FOR ALL
+  USING (
+    auth.role() = 'authenticated'
+    AND public.get_my_role() = 'staff'
+    AND hall_id = public.get_my_hall_id()
+  )
+  WITH CHECK (
+    auth.role() = 'authenticated'
+    AND public.get_my_role() = 'staff'
+    AND hall_id = public.get_my_hall_id()
+  );
+
+DROP POLICY IF EXISTS public_read_meal_daily_prices ON public.meal_daily_prices;
+CREATE POLICY public_read_meal_daily_prices ON public.meal_daily_prices
+  FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS staff_manage_meal_daily_prices ON public.meal_daily_prices;
+CREATE POLICY staff_manage_meal_daily_prices ON public.meal_daily_prices
+  FOR ALL
+  USING (
+    auth.role() = 'authenticated'
+    AND public.get_my_role() = 'staff'
+    AND hall_id = public.get_my_hall_id()
+  )
+  WITH CHECK (
+    auth.role() = 'authenticated'
+    AND public.get_my_role() = 'staff'
+    AND hall_id = public.get_my_hall_id()
   );
 
 -- Optional quick check (replace values):

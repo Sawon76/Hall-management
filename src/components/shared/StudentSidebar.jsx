@@ -1,4 +1,4 @@
-import { HelpCircle, Home, Lock, Mail, Receipt, User, X } from 'lucide-react'
+import { BookOpenText, HelpCircle, Home, Lock, Mail, Receipt, User, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 import { useUiStore } from '../../store/uiStore'
@@ -7,6 +7,7 @@ const navItems = [
   { label: 'Home', icon: Home, route: '/student/home' },
   { label: 'Profile', icon: User, route: '/student/profile' },
   { label: 'Payment Details', icon: Receipt, route: '/student/payments' },
+  { label: 'Weekly Menu', icon: BookOpenText, route: '/student/weekly-menu' },
   { label: 'Change Password', icon: Lock, route: '/student/change-password' },
   { label: 'Help', icon: HelpCircle, route: '/student/help' },
   { label: 'Contact', icon: Mail, route: '/student/contact' },

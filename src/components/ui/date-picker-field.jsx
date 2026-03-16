@@ -72,7 +72,6 @@ export default function DatePickerField({
             mode="single"
             selected={value ? new Date(value) : undefined}
             defaultMonth={value ? new Date(value) : minDate || new Date()}
-            month={value ? new Date(value) : minDate || new Date()}
             onSelect={(date) => {
               if (!date || disabledMatcher(date)) {
                 return

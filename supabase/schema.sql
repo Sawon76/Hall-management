@@ -99,6 +99,31 @@ CREATE TABLE IF NOT EXISTS contact_messages (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS weekly_menus (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  hall_id UUID REFERENCES halls(id) ON DELETE CASCADE NOT NULL,
+  day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+  day_name TEXT NOT NULL,
+  breakfast TEXT DEFAULT '',
+  lunch TEXT DEFAULT '',
+  dinner TEXT DEFAULT '',
+  updated_by UUID REFERENCES profiles(id),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(hall_id, day_of_week)
+);
+
+CREATE TABLE IF NOT EXISTS meal_daily_prices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  hall_id UUID REFERENCES halls(id) ON DELETE CASCADE NOT NULL,
+  date DATE NOT NULL,
+  breakfast_price NUMERIC NOT NULL DEFAULT 0,
+  lunch_price NUMERIC NOT NULL DEFAULT 0,
+  dinner_price NUMERIC NOT NULL DEFAULT 0,
+  updated_by UUID REFERENCES profiles(id),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(hall_id, date)
+);
+
 CREATE INDEX IF NOT EXISTS idx_profiles_hall_id ON profiles(hall_id);
 CREATE INDEX IF NOT EXISTS idx_students_hall_id ON students(hall_id);
 CREATE INDEX IF NOT EXISTS idx_students_student_id ON students(student_id);
@@ -107,6 +132,8 @@ CREATE INDEX IF NOT EXISTS idx_hall_closures_hall_id ON hall_closures(hall_id);
 CREATE INDEX IF NOT EXISTS idx_billing_configs_hall_month ON billing_configs(hall_id, billing_month);
 CREATE INDEX IF NOT EXISTS idx_payment_slips_student_month ON payment_slips(student_id, billing_month);
 CREATE INDEX IF NOT EXISTS idx_contact_messages_student_id ON contact_messages(student_id);
+CREATE INDEX IF NOT EXISTS idx_weekly_menus_hall_day ON weekly_menus(hall_id, day_of_week);
+CREATE INDEX IF NOT EXISTS idx_meal_daily_prices_hall_date ON meal_daily_prices(hall_id, date);
 
 CREATE OR REPLACE FUNCTION public.get_my_role()
 RETURNS TEXT
@@ -323,6 +350,8 @@ ALTER TABLE hall_closures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE billing_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payment_slips ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contact_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE weekly_menus ENABLE ROW LEVEL SECURITY;
+ALTER TABLE meal_daily_prices ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS public_read_halls ON halls;
 CREATE POLICY public_read_halls ON halls
@@ -458,4 +487,42 @@ CREATE POLICY hall_staff_read_contact_messages ON contact_messages
   USING (
     auth.role() = 'authenticated'
     AND public.get_my_role() IN ('provost', 'staff')
+  );
+
+DROP POLICY IF EXISTS public_read_weekly_menus ON weekly_menus;
+CREATE POLICY public_read_weekly_menus ON weekly_menus
+  FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS staff_manage_weekly_menus ON weekly_menus;
+CREATE POLICY staff_manage_weekly_menus ON weekly_menus
+  FOR ALL
+  USING (
+    auth.role() = 'authenticated'
+    AND public.get_my_role() = 'staff'
+    AND hall_id = public.get_my_hall_id()
+  )
+  WITH CHECK (
+    auth.role() = 'authenticated'
+    AND public.get_my_role() = 'staff'
+    AND hall_id = public.get_my_hall_id()
+  );
+
+DROP POLICY IF EXISTS public_read_meal_daily_prices ON meal_daily_prices;
+CREATE POLICY public_read_meal_daily_prices ON meal_daily_prices
+  FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS staff_manage_meal_daily_prices ON meal_daily_prices;
+CREATE POLICY staff_manage_meal_daily_prices ON meal_daily_prices
+  FOR ALL
+  USING (
+    auth.role() = 'authenticated'
+    AND public.get_my_role() = 'staff'
+    AND hall_id = public.get_my_hall_id()
+  )
+  WITH CHECK (
+    auth.role() = 'authenticated'
+    AND public.get_my_role() = 'staff'
+    AND hall_id = public.get_my_hall_id()
   );
