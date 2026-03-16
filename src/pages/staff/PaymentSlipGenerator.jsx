@@ -13,7 +13,7 @@ import { useAuthStore } from '../../store/authStore'
 import { formatMoney, generateAllSlips } from '../../utils/paymentUtils'
 
 const INITIAL_FORM = {
-  billing_month: format(new Date(), 'yyyy-MM'),
+  billing_month: format(subMonths(new Date(), 1), 'yyyy-MM'),
   total_meal_charge: '',
   other_bills: '0',
   fuel_and_spices: '0',
