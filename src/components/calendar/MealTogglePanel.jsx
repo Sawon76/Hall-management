@@ -23,6 +23,7 @@ export default function MealTogglePanel({
   hallClosures = [],
   onToggleMeal,
   savingMeal,
+  cutoffHour = 19,
 }) {
   if (!selectedDate) {
     return (
@@ -34,8 +35,8 @@ export default function MealTogglePanel({
   }
 
   const mealState = getMealStateForDate(selectedDate, mealRecords, hallClosures)
-  const canEditMeals = isMealDateEditable(selectedDate)
-  const lockReason = canEditMeals ? '' : getMealEditLockReason(selectedDate)
+  const canEditMeals = isMealDateEditable(selectedDate, new Date(), cutoffHour)
+  const lockReason = canEditMeals ? '' : getMealEditLockReason(selectedDate, new Date(), cutoffHour)
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-soft">

@@ -15,11 +15,27 @@ import { CALENDAR_STATUS, MEAL_TYPES } from '../constants'
 
 export const getDateKey = (date) => format(new Date(date), 'yyyy-MM-dd')
 
-export const getMealEditWindow = (now = new Date()) => {
+const formatCutoffHourLabel = (cutoffHour) => {
+  if (cutoffHour === 0) {
+    return '12:00 AM'
+  }
+
+  if (cutoffHour < 12) {
+    return `${cutoffHour}:00 AM`
+  }
+
+  if (cutoffHour === 12) {
+    return '12:00 PM'
+  }
+
+  return `${cutoffHour - 12}:00 PM`
+}
+
+export const getMealEditWindow = (now = new Date(), cutoffHour = 19) => {
   const currentDateTime = new Date(now)
   const startOfToday = startOfDay(currentDateTime)
   const cutoff = new Date(startOfToday)
-  cutoff.setHours(19, 0, 0, 0)
+  cutoff.setHours(cutoffHour, 0, 0, 0)
 
   const firstEditableDate = addDays(startOfToday, isBefore(currentDateTime, cutoff) ? 1 : 2)
   const lastEditableDate = endOfMonth(currentDateTime)
@@ -31,14 +47,14 @@ export const getMealEditWindow = (now = new Date()) => {
   }
 }
 
-export const isMealDateEditable = (date, now = new Date()) => {
+export const isMealDateEditable = (date, now = new Date(), cutoffHour = 19) => {
   if (!date) {
     return false
   }
 
   const targetDate = startOfDay(new Date(date))
   const currentDateTime = new Date(now)
-  const { firstEditableDate, lastEditableDate, hasEditableDates } = getMealEditWindow(currentDateTime)
+  const { firstEditableDate, lastEditableDate, hasEditableDates } = getMealEditWindow(currentDateTime, cutoffHour)
 
   if (!hasEditableDates) {
     return false
@@ -51,7 +67,7 @@ export const isMealDateEditable = (date, now = new Date()) => {
   )
 }
 
-export const getMealEditLockReason = (date, now = new Date()) => {
+export const getMealEditLockReason = (date, now = new Date(), cutoffHour = 19) => {
   if (!date) {
     return 'Select a date to manage meals.'
   }
@@ -60,7 +76,7 @@ export const getMealEditLockReason = (date, now = new Date()) => {
   const currentDateTime = new Date(now)
   const currentMonthStart = startOfMonth(currentDateTime)
   const currentMonthEnd = endOfMonth(currentDateTime)
-  const { firstEditableDate, hasEditableDates } = getMealEditWindow(currentDateTime)
+  const { firstEditableDate, hasEditableDates } = getMealEditWindow(currentDateTime, cutoffHour)
 
   if (!hasEditableDates) {
     return 'No meal changes are available for the rest of this month.'
@@ -74,7 +90,7 @@ export const getMealEditLockReason = (date, now = new Date()) => {
     const tomorrowKey = getDateKey(addDays(startOfDay(currentDateTime), 1))
 
     if (getDateKey(targetDate) === tomorrowKey) {
-      return 'Next-day meal changes close at 7:00 PM on the previous day.'
+      return `Next-day meal changes close at ${formatCutoffHourLabel(cutoffHour)} on the previous day.`
     }
 
     return 'Past and same-day meals cannot be changed.'

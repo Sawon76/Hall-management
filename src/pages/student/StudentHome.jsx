@@ -24,10 +24,28 @@ import {
   isMealDateEditable,
 } from '../../utils/mealUtils'
 
+const getMealCutoffHourForHall = (hallName = '') => {
+  const normalized = hallName.toLowerCase()
+  const isGirlsAnnex = normalized.includes('girls') && normalized.includes('annex')
+  const isTaramonBibi = normalized.includes('bir pratik taramon bibi')
+
+  return isGirlsAnnex || isTaramonBibi ? 15 : 19
+}
+
+const formatCutoffHourLabel = (hour) => {
+  if (hour === 15) {
+    return '3:00 PM'
+  }
+
+  return '7:00 PM'
+}
+
 export default function StudentHome() {
   const studentSession = useAuthStore((state) => state.studentSession)
-  const mealEditWindow = useMemo(() => getMealEditWindow(), [])
   const currentMonth = useMemo(() => new Date(), [])
+  const [hallInfo, setHallInfo] = useState(null)
+  const mealCutoffHour = useMemo(() => getMealCutoffHourForHall(hallInfo?.name), [hallInfo?.name])
+  const mealEditWindow = useMemo(() => getMealEditWindow(new Date(), mealCutoffHour), [mealCutoffHour])
   const initialSelectedDate = useMemo(
     () => (mealEditWindow.hasEditableDates ? mealEditWindow.firstEditableDate : currentMonth),
     [currentMonth, mealEditWindow],
@@ -37,7 +55,6 @@ export default function StudentHome() {
   const [selectedDate, setSelectedDate] = useState(initialSelectedDate)
   const [mealRecords, setMealRecords] = useState([])
   const [hallClosures, setHallClosures] = useState([])
-  const [hallInfo, setHallInfo] = useState(null)
   const [weeklyMenuRows, setWeeklyMenuRows] = useState(createDefaultWeeklyMenuRows())
   const [loadingWeeklyMenu, setLoadingWeeklyMenu] = useState(true)
   const [priceCalendarMonth, setPriceCalendarMonth] = useState(new Date())
@@ -77,7 +94,7 @@ export default function StudentHome() {
     [weeklyMenuRows],
   )
 
-  const canEditDate = (date) => isMealDateEditable(date)
+  const canEditDate = (date) => isMealDateEditable(date, new Date(), mealCutoffHour)
 
   const loadStudentData = async () => {
     if (!studentSession?.id || !studentSession?.hall_id) {
@@ -224,8 +241,8 @@ export default function StudentHome() {
       return
     }
 
-    if (!isMealDateEditable(selectedDate)) {
-      toast.error(getMealEditLockReason(selectedDate))
+    if (!isMealDateEditable(selectedDate, new Date(), mealCutoffHour)) {
+      toast.error(getMealEditLockReason(selectedDate, new Date(), mealCutoffHour))
       return
     }
 
@@ -258,9 +275,9 @@ export default function StudentHome() {
       return
     }
 
-    const invalidDate = dates.find((date) => !isMealDateEditable(date))
+    const invalidDate = dates.find((date) => !isMealDateEditable(date, new Date(), mealCutoffHour))
     if (invalidDate) {
-      toast.error(getMealEditLockReason(invalidDate))
+      toast.error(getMealEditLockReason(invalidDate, new Date(), mealCutoffHour))
       return
     }
 
@@ -398,7 +415,7 @@ export default function StudentHome() {
 
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
           <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
-          Meals can only be changed for upcoming eligible dates in this month, and next-day changes close at 7:00 PM on the previous day. Hall closure dates are skipped automatically.
+          Meals can only be changed for upcoming eligible dates in this month, and next-day changes close at {formatCutoffHourLabel(mealCutoffHour)} on the previous day. Hall closure dates are skipped automatically.
         </div>
       </div>
 
@@ -414,7 +431,7 @@ export default function StudentHome() {
           onNextMonth={() => {}}
           canPrevMonth={false}
           canNextMonth={false}
-          isDateDisabled={(date) => !isMealDateEditable(date)}
+          isDateDisabled={(date) => !isMealDateEditable(date, new Date(), mealCutoffHour)}
         />
 
         <MealTogglePanel
@@ -423,6 +440,7 @@ export default function StudentHome() {
           hallClosures={hallClosures}
           onToggleMeal={handleToggleMeal}
           savingMeal={savingMeal}
+          cutoffHour={mealCutoffHour}
         />
       </div>
 

@@ -227,11 +227,30 @@ SET search_path = public
 AS $$
 DECLARE
   local_now TIMESTAMP := timezone('Asia/Dhaka', now());
-  target_deadline TIMESTAMP := ((NEW.date::timestamp - INTERVAL '1 day') + TIME '19:00');
+  student_hall_name TEXT;
+  cutoff_time TIME := TIME '19:00';
+  target_deadline TIMESTAMP;
+  cutoff_label TEXT := '7:00 PM';
 BEGIN
   IF auth.role() = 'authenticated' AND public.get_my_role() IN ('provost', 'staff') THEN
     RETURN NEW;
   END IF;
+
+  SELECT h.name
+  INTO student_hall_name
+  FROM public.students s
+  JOIN public.halls h ON h.id = s.hall_id
+  WHERE s.id = NEW.student_id
+  LIMIT 1;
+
+  IF COALESCE(student_hall_name, '') ILIKE '%girls%annex%'
+     OR COALESCE(student_hall_name, '') ILIKE '%bir pratik taramon bibi%'
+  THEN
+    cutoff_time := TIME '15:00';
+    cutoff_label := '3:00 PM';
+  END IF;
+
+  target_deadline := ((NEW.date::timestamp - INTERVAL '1 day') + cutoff_time);
 
   IF to_char(NEW.date, 'YYYY-MM') <> to_char(local_now, 'YYYY-MM') THEN
     RAISE EXCEPTION 'Meals can only be changed for dates in the current month.';
@@ -242,7 +261,7 @@ BEGIN
   END IF;
 
   IF local_now >= target_deadline THEN
-    RAISE EXCEPTION 'Next-day meal changes close at 7:00 PM on the previous day.';
+    RAISE EXCEPTION 'Next-day meal changes close at % on the previous day.', cutoff_label;
   END IF;
 
   RETURN NEW;
