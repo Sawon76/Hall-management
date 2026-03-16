@@ -1,4 +1,4 @@
-import { addDays, format } from 'date-fns'
+import { addDays, format, subMonths } from 'date-fns'
 import { AlertTriangle, CalendarClock, FileSpreadsheet, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -11,6 +11,7 @@ export default function StaffDashboard() {
 
   const [stats, setStats] = useState({
     pendingPayments: 0,
+    pendingPaymentsMonthLabel: format(subMonths(new Date(), 1), 'MMMM yyyy'),
     studentsWithDues: 0,
     closuresThisWeek: [],
   })
@@ -26,7 +27,9 @@ export default function StaffDashboard() {
       }
 
       const now = new Date()
-      const thisMonth = format(now, 'yyyy-MM')
+      const latestCompletedMonth = subMonths(now, 1)
+      const pendingPaymentsMonth = format(latestCompletedMonth, 'yyyy-MM')
+      const pendingPaymentsMonthLabel = format(latestCompletedMonth, 'MMMM yyyy')
       const today = format(now, 'yyyy-MM-dd')
       const weekAhead = format(addDays(now, 7), 'yyyy-MM-dd')
 
@@ -35,7 +38,7 @@ export default function StaffDashboard() {
           .from('payment_slips')
           .select('id', { count: 'exact', head: true })
           .eq('hall_id', user.hall_id)
-          .eq('billing_month', thisMonth)
+          .eq('billing_month', pendingPaymentsMonth)
           .eq('status', 'unpaid'),
         supabase
           .from('hall_closures')
@@ -69,6 +72,7 @@ export default function StaffDashboard() {
 
       setStats({
         pendingPayments: pendingRes.count ?? 0,
+        pendingPaymentsMonthLabel,
         studentsWithDues,
         closuresThisWeek: closuresRes.data ?? [],
       })
@@ -91,7 +95,7 @@ export default function StaffDashboard() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <DashboardCard
-          title="Pending Payments This Month"
+          title={`Pending Payments (${stats.pendingPaymentsMonthLabel})`}
           icon={FileSpreadsheet}
           value={loading ? '...' : stats.pendingPayments}
           color="bg-red-50 text-red-700"
