@@ -1,12 +1,20 @@
 import { format } from 'date-fns'
+import { Coffee, Soup, UtensilsCrossed } from 'lucide-react'
 
 import { MEAL_TYPES } from '../../constants'
+import { OrangeToggle } from '../ui/toggle'
 import { getMealStateForDate } from '../../utils/mealUtils'
 
 const LABELS = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',
   dinner: 'Dinner',
+}
+
+const ICONS = {
+  breakfast: Coffee,
+  lunch: Soup,
+  dinner: UtensilsCrossed,
 }
 
 export default function MealTogglePanel({
@@ -40,27 +48,43 @@ export default function MealTogglePanel({
           {MEAL_TYPES.map((mealType) => {
             const enabled = Boolean(mealState[mealType])
             const isSaving = savingMeal === mealType
+            const Icon = ICONS[mealType]
 
             return (
-              <button
+              <div
                 key={mealType}
-                type="button"
-                onClick={() => onToggleMeal?.(mealType, !enabled)}
-                disabled={isSaving}
-                className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-primary disabled:cursor-not-allowed disabled:opacity-70"
+                className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-primary"
               >
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">{LABELS[mealType]}</p>
-                  <p className="text-xs text-slate-500">{enabled ? 'Meal is ON' : 'Meal is OFF'}</p>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
+                      enabled ? 'bg-orange-100 text-orange-700' : 'bg-slate-200 text-slate-500'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{LABELS[mealType]}</p>
+                    <p className="text-xs text-slate-500">{isSaving ? 'Saving...' : enabled ? 'Meal is ON' : 'Meal is OFF'}</p>
+                  </div>
                 </div>
-                <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                    enabled ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600'
-                  }`}
-                >
-                  {isSaving ? 'Saving...' : enabled ? 'On' : 'Off'}
-                </span>
-              </button>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`text-xs font-semibold uppercase tracking-wide ${
+                      enabled ? 'text-orange-700' : 'text-slate-500'
+                    }`}
+                  >
+                    {enabled ? 'On' : 'Off'}
+                  </span>
+                  <OrangeToggle
+                    checked={enabled}
+                    onChange={() => onToggleMeal?.(mealType, !enabled)}
+                    disabled={isSaving}
+                    aria-label={`${LABELS[mealType]} toggle for ${selectedDate}`}
+                    className="disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
+              </div>
             )
           })}
         </div>
