@@ -192,6 +192,41 @@ REVOKE ALL ON FUNCTION public.student_exists(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.student_exists(UUID) TO anon;
 GRANT EXECUTE ON FUNCTION public.student_exists(UUID) TO authenticated;
 
+CREATE OR REPLACE FUNCTION public.enforce_student_meal_change_window()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  local_now TIMESTAMP := timezone('Asia/Dhaka', now());
+  target_deadline TIMESTAMP := ((NEW.date::timestamp - INTERVAL '1 day') + TIME '19:00');
+BEGIN
+  IF auth.role() = 'authenticated' AND public.get_my_role() IN ('provost', 'staff') THEN
+    RETURN NEW;
+  END IF;
+
+  IF to_char(NEW.date, 'YYYY-MM') <> to_char(local_now, 'YYYY-MM') THEN
+    RAISE EXCEPTION 'Meals can only be changed for dates in the current month.';
+  END IF;
+
+  IF NEW.date <= local_now::date THEN
+    RAISE EXCEPTION 'Past and same-day meals cannot be changed.';
+  END IF;
+
+  IF local_now >= target_deadline THEN
+    RAISE EXCEPTION 'Next-day meal changes close at 7:00 PM on the previous day.';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_meal_records_student_change_window ON public.meal_records;
+CREATE TRIGGER trg_meal_records_student_change_window
+BEFORE INSERT OR UPDATE ON public.meal_records
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_student_meal_change_window();
+
 CREATE OR REPLACE FUNCTION public.enforce_previous_billing_month()
 RETURNS TRIGGER
 LANGUAGE plpgsql

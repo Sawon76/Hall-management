@@ -3,7 +3,7 @@ import { Coffee, Soup, UtensilsCrossed } from 'lucide-react'
 
 import { MEAL_TYPES } from '../../constants'
 import { OrangeToggle } from '../ui/toggle'
-import { getMealStateForDate } from '../../utils/mealUtils'
+import { getMealEditLockReason, getMealStateForDate, isMealDateEditable } from '../../utils/mealUtils'
 
 const LABELS = {
   breakfast: 'Breakfast',
@@ -34,6 +34,8 @@ export default function MealTogglePanel({
   }
 
   const mealState = getMealStateForDate(selectedDate, mealRecords, hallClosures)
+  const canEditMeals = isMealDateEditable(selectedDate)
+  const lockReason = canEditMeals ? '' : getMealEditLockReason(selectedDate)
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-soft">
@@ -42,6 +44,10 @@ export default function MealTogglePanel({
       {mealState.disabled ? (
         <div className="mt-4 rounded-xl border border-pink-200 bg-pink-50 px-4 py-4 text-sm text-pink-800">
           Hall is officially closed on this date. Meals cannot be changed.
+        </div>
+      ) : !canEditMeals ? (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+          {lockReason}
         </div>
       ) : (
         <div className="mt-4 space-y-3">

@@ -23,6 +23,9 @@ export default function CalendarComponent({
   onDateClick,
   onPrevMonth,
   onNextMonth,
+  canPrevMonth = true,
+  canNextMonth = true,
+  isDateDisabled,
 }) {
   const monthDays = getDaysInMonth(year, month)
   const gridStart = startOfWeek(monthDays[0])
@@ -35,7 +38,8 @@ export default function CalendarComponent({
         <button
           type="button"
           onClick={onPrevMonth}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-primary hover:text-primary"
+          disabled={!canPrevMonth}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Previous month"
         >
           <ChevronLeft className="h-5 w-5" />
@@ -46,7 +50,8 @@ export default function CalendarComponent({
         <button
           type="button"
           onClick={onNextMonth}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-primary hover:text-primary"
+          disabled={!canNextMonth}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Next month"
         >
           <ChevronRight className="h-5 w-5" />
@@ -67,15 +72,17 @@ export default function CalendarComponent({
           const isCurrentMonth = isSameMonth(date, new Date(year, month))
           const isSelected = selectedDate ? isSameDay(date, selectedDate) : false
           const baseClass = STATUS_CLASSES[status] || STATUS_CLASSES.default
+          const disabled = Boolean(isDateDisabled?.(date))
 
           return (
             <button
               key={date.toISOString()}
               type="button"
+              disabled={disabled}
               onClick={() => onDateClick?.(date)}
               className={`min-h-20 rounded-2xl border p-2 text-left transition ${baseClass} ${
                 isCurrentMonth ? 'border-slate-200' : 'border-transparent opacity-45'
-              } ${isSelected ? 'ring-2 ring-blue-500' : ''} ${isToday(date) ? 'border-2 border-blue-400 font-bold' : ''}`}
+              } ${isSelected ? 'ring-2 ring-blue-500' : ''} ${isToday(date) ? 'border-2 border-blue-400 font-bold' : ''} ${disabled ? 'cursor-not-allowed opacity-40' : ''}`}
             >
               <span className="block text-sm font-semibold">{format(date, 'd')}</span>
               <span className="mt-3 block text-[11px] font-medium uppercase tracking-wide">

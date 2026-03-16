@@ -1,8 +1,87 @@
-import { endOfMonth, eachDayOfInterval, format, isWithinInterval, startOfMonth } from 'date-fns'
+import {
+  addDays,
+  endOfMonth,
+  eachDayOfInterval,
+  format,
+  isAfter,
+  isBefore,
+  isSameMonth,
+  isWithinInterval,
+  startOfDay,
+  startOfMonth,
+} from 'date-fns'
 
 import { CALENDAR_STATUS, MEAL_TYPES } from '../constants'
 
 export const getDateKey = (date) => format(new Date(date), 'yyyy-MM-dd')
+
+export const getMealEditWindow = (now = new Date()) => {
+  const currentDateTime = new Date(now)
+  const startOfToday = startOfDay(currentDateTime)
+  const cutoff = new Date(startOfToday)
+  cutoff.setHours(19, 0, 0, 0)
+
+  const firstEditableDate = addDays(startOfToday, isBefore(currentDateTime, cutoff) ? 1 : 2)
+  const lastEditableDate = endOfMonth(currentDateTime)
+
+  return {
+    firstEditableDate,
+    lastEditableDate,
+    hasEditableDates: !isAfter(firstEditableDate, lastEditableDate),
+  }
+}
+
+export const isMealDateEditable = (date, now = new Date()) => {
+  if (!date) {
+    return false
+  }
+
+  const targetDate = startOfDay(new Date(date))
+  const currentDateTime = new Date(now)
+  const { firstEditableDate, lastEditableDate, hasEditableDates } = getMealEditWindow(currentDateTime)
+
+  if (!hasEditableDates) {
+    return false
+  }
+
+  return (
+    isSameMonth(targetDate, currentDateTime) &&
+    !isBefore(targetDate, firstEditableDate) &&
+    !isAfter(targetDate, lastEditableDate)
+  )
+}
+
+export const getMealEditLockReason = (date, now = new Date()) => {
+  if (!date) {
+    return 'Select a date to manage meals.'
+  }
+
+  const targetDate = startOfDay(new Date(date))
+  const currentDateTime = new Date(now)
+  const currentMonthStart = startOfMonth(currentDateTime)
+  const currentMonthEnd = endOfMonth(currentDateTime)
+  const { firstEditableDate, hasEditableDates } = getMealEditWindow(currentDateTime)
+
+  if (!hasEditableDates) {
+    return 'No meal changes are available for the rest of this month.'
+  }
+
+  if (isBefore(targetDate, currentMonthStart) || isAfter(targetDate, currentMonthEnd)) {
+    return 'Meals can only be changed for dates in the current month.'
+  }
+
+  if (isBefore(targetDate, firstEditableDate)) {
+    const tomorrowKey = getDateKey(addDays(startOfDay(currentDateTime), 1))
+
+    if (getDateKey(targetDate) === tomorrowKey) {
+      return 'Next-day meal changes close at 7:00 PM on the previous day.'
+    }
+
+    return 'Past and same-day meals cannot be changed.'
+  }
+
+  return ''
+}
 
 export const getMealRecordForDate = (date, mealRecords = []) => {
   const currentDate = getDateKey(date)

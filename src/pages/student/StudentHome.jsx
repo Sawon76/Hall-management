@@ -12,17 +12,26 @@ import { useAuthStore } from '../../store/authStore'
 import { getDatesInRange } from '../../utils/dateUtils'
 import {
   calculateMealsForMonth,
+  getMealEditLockReason,
+  getMealEditWindow,
   getDateKey,
   getMealRecordForDate,
   getMealStateForDate,
   isHallClosedOnDate,
+  isMealDateEditable,
 } from '../../utils/mealUtils'
 
 export default function StudentHome() {
   const studentSession = useAuthStore((state) => state.studentSession)
+  const mealEditWindow = useMemo(() => getMealEditWindow(), [])
+  const currentMonth = useMemo(() => new Date(), [])
+  const initialSelectedDate = useMemo(
+    () => (mealEditWindow.hasEditableDates ? mealEditWindow.firstEditableDate : currentMonth),
+    [currentMonth, mealEditWindow],
+  )
 
-  const [visibleDate, setVisibleDate] = useState(new Date())
-  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [visibleDate] = useState(currentMonth)
+  const [selectedDate, setSelectedDate] = useState(initialSelectedDate)
   const [mealRecords, setMealRecords] = useState([])
   const [hallClosures, setHallClosures] = useState([])
   const [hallInfo, setHallInfo] = useState(null)
@@ -30,8 +39,8 @@ export default function StudentHome() {
   const [savingMeal, setSavingMeal] = useState('')
   const [savingRange, setSavingRange] = useState(false)
   const [rangeForm, setRangeForm] = useState({
-    fromDate: format(new Date(), 'yyyy-MM-dd'),
-    toDate: format(new Date(), 'yyyy-MM-dd'),
+    fromDate: format(initialSelectedDate, 'yyyy-MM-dd'),
+    toDate: format(initialSelectedDate, 'yyyy-MM-dd'),
     mode: 'on',
   })
 
@@ -135,6 +144,11 @@ export default function StudentHome() {
       return
     }
 
+    if (!isMealDateEditable(selectedDate)) {
+      toast.error(getMealEditLockReason(selectedDate))
+      return
+    }
+
     setSavingMeal(mealType)
 
     const currentState = getMealStateForDate(selectedDate, mealRecords, hallClosures)
@@ -161,6 +175,12 @@ export default function StudentHome() {
     const dates = getDatesInRange(rangeForm.fromDate, rangeForm.toDate)
     if (!dates.length) {
       toast.error('Invalid date range')
+      return
+    }
+
+    const invalidDate = dates.find((date) => !isMealDateEditable(date))
+    if (invalidDate) {
+      toast.error(getMealEditLockReason(invalidDate))
       return
     }
 
@@ -234,6 +254,8 @@ export default function StudentHome() {
             <input
               type="date"
               value={rangeForm.fromDate}
+              min={format(mealEditWindow.firstEditableDate, 'yyyy-MM-dd')}
+              max={format(mealEditWindow.lastEditableDate, 'yyyy-MM-dd')}
               onChange={(event) =>
                 setRangeForm((previous) => ({ ...previous, fromDate: event.target.value }))
               }
@@ -246,6 +268,8 @@ export default function StudentHome() {
             <input
               type="date"
               value={rangeForm.toDate}
+              min={format(mealEditWindow.firstEditableDate, 'yyyy-MM-dd')}
+              max={format(mealEditWindow.lastEditableDate, 'yyyy-MM-dd')}
               onChange={(event) =>
                 setRangeForm((previous) => ({ ...previous, toDate: event.target.value }))
               }
@@ -280,7 +304,7 @@ export default function StudentHome() {
           <button
             type="button"
             onClick={handleRangeSave}
-            disabled={savingRange}
+            disabled={savingRange || !mealEditWindow.hasEditableDates}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
           >
             <Save className="h-4 w-4" />
@@ -290,7 +314,7 @@ export default function StudentHome() {
 
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
           <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
-          Hall closure dates are skipped automatically when saving a range.
+          Meals can only be changed for upcoming eligible dates in this month, and next-day changes close at 7:00 PM on the previous day. Hall closure dates are skipped automatically.
         </div>
       </div>
 
@@ -302,8 +326,11 @@ export default function StudentHome() {
           hallClosures={hallClosures}
           selectedDate={selectedDate}
           onDateClick={setSelectedDate}
-          onPrevMonth={() => setVisibleDate((current) => subMonths(current, 1))}
-          onNextMonth={() => setVisibleDate((current) => addMonths(current, 1))}
+          onPrevMonth={() => {}}
+          onNextMonth={() => {}}
+          canPrevMonth={false}
+          canNextMonth={false}
+          isDateDisabled={(date) => !isMealDateEditable(date)}
         />
 
         <MealTogglePanel
