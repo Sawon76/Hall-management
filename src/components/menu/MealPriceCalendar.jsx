@@ -44,13 +44,50 @@ export default function MealPriceCalendar({ month, onMonthChange, priceByDate = 
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <div className="hidden grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 sm:grid">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
           <div key={day} className="py-1">{day}</div>
         ))}
       </div>
 
-      <div className="mt-2 grid grid-cols-7 gap-2">
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:hidden">
+        {calendarDays
+          .filter((date) => isSameMonth(date, month))
+          .map((date) => {
+            const dateKey = format(date, 'yyyy-MM-dd')
+            const priceLabel = priceByDate[dateKey] || '0|0|0'
+            const displayPriceLabel = priceLabel.split('|').join(' | ')
+            const pastDate = isBefore(startOfDay(date), todayStart)
+            const today = isToday(date)
+
+            return (
+              <div
+                key={dateKey}
+                className={`rounded-xl border px-3 py-2 ${
+                  today
+                    ? 'border-blue-300 bg-blue-50 ring-2 ring-blue-200'
+                    : pastDate
+                      ? 'border-slate-200 bg-slate-100 text-slate-400'
+                      : 'border-slate-200 bg-slate-50'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className={`text-sm font-semibold ${today ? 'text-blue-700' : 'text-slate-700'}`}>
+                    {format(date, 'EEE, d MMM')}
+                  </p>
+                  <p className={`text-xs font-bold tracking-[0.12em] ${pastDate ? 'text-slate-400' : 'text-slate-600'}`}>
+                    B | L | D
+                  </p>
+                </div>
+                <p className={`mt-1 text-sm font-bold ${pastDate ? 'text-slate-500' : 'text-slate-900'}`}>
+                  {loading ? '...' : displayPriceLabel}
+                </p>
+              </div>
+            )
+          })}
+      </div>
+
+      <div className="mt-2 hidden grid-cols-7 gap-2 sm:grid">
         {calendarDays.map((date) => {
           const dateKey = format(date, 'yyyy-MM-dd')
           const priceLabel = priceByDate[dateKey] || '0|0|0'
